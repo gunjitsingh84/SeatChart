@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SeatChart</title></head><body>
+<div style="font-family:system-ui;padding:24px">Loading SeatChart…</div>
+<script>
+(async()=>{
+  try{
+    const r=await fetch('https://raw.githubusercontent.com/gunjitsingh84/SeatChart/main/index.html?fix='+Date.now(),{cache:'no-store'});
+    let html=await r.text();
+    html=html.replace('!name||!school!/^[0-9]{6}$/.test(pin)', '!name||!school||!/^[0-9]{6}$/.test(pin)');
+    document.open();document.write(html);document.close();
+  }catch(e){document.body.innerHTML='<div style="font-family:system-ui;padding:24px"><h2>SeatChart</h2><p>Unable to load the application. Please refresh.</p></div>';console.error(e)}
+})();
+</script></body></html>
