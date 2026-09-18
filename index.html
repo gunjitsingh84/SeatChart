@@ -19,7 +19,7 @@
 <div id="toast" style="display:none;position:fixed;right:18px;bottom:18px;background:#172033;color:#fff;padding:11px 14px;border-radius:8px;font-size:11px;z-index:80"></div>
 <script>
 const SUPABASE_URL='https://iykvboyzviguuaejppkw.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzU2MTg2NzkwLCJleHAiOjIwNzE3NjI3OTB9';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5a3Zib3l6dmlndXVhZWpwcGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxODY3OTAsImV4cCI6MjA3MTc2Mjc5MH0.tmBPm6UjDapcCb9xjq60vdtEIY2mCNjd7ar-85l_P3w';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);const APP={user:null,schoolId:null,sessionId:null,profile:null};
 function authError(msg){document.getElementById('authError').innerHTML=`<div class="error-note">${msg}</div>`}
 function normalizePhone(v){v=String(v||'').replace(/\D/g,'');return v.length===10?'+91'+v:v}
