@@ -330,18 +330,16 @@ async function createExamPlannerDb(){
 }
 function renderExamPlannerModal(){
   const d=window.examPlannerDraft;if(!d)return;
-  d.form=d.form||{name:'',start:'',end:'',startTime:'09:00',endTime:'12:00',includeSaturdays:false};
-  if(document.getElementById('plannerExamName')){d.form.name=document.getElementById('plannerExamName').value;d.form.start=document.getElementById('plannerStartDate').value;d.form.end=document.getElementById('plannerEndDate').value;d.form.startTime=document.getElementById('plannerStartTime').value;d.form.endTime=document.getElementById('plannerEndTime').value;d.form.includeSaturdays=document.getElementById('plannerIncludeSaturdays').checked;}
+  d.form=d.form||{name:'',start:'',end:'',startTime:'09:00',endTime:'12:00',includeSaturdays:false,studyLeaveDays:0};
+  if(document.getElementById('plannerExamName')){d.form.name=document.getElementById('plannerExamName').value;d.form.start=document.getElementById('plannerStartDate').value;d.form.end=document.getElementById('plannerEndDate').value;d.form.startTime=document.getElementById('plannerStartTime').value;d.form.endTime=document.getElementById('plannerEndTime').value;d.form.includeSaturdays=document.getElementById('plannerIncludeSaturdays').checked;d.form.studyLeaveDays=Number(document.getElementById('plannerStudyLeaveDays').value||0);}
   const subjectByClass=new Map(d.subjects.map(s=>[s.class_id,s]));
   const selectedSubjectCount=d.selectedSubjects.size;
   openModal(`<div class="modalhead"><h2>Create Examination</h2><button class="x" onclick="closeModal()">×</button></div>
   <p>Set the examination period and rules. Subjects are selected automatically for each chosen class.</p>
+  <div class="field"><label>Exam Name *</label><input id="plannerExamName" value="${plannerEscape(d.form.name)}" placeholder="Annual Examination 2026–27"></div>
   <div class="split">
-    <div class="field"><label>Exam Name *</label><input id="plannerExamName" value="${plannerEscape(d.form.name)}" placeholder="Annual Examination 2026–27"></div>
-  </div>
-  <div class="split">
-    <div class="field"><label>Start Date *</label><input id="plannerStartDate" type="date" value="${d.form.start}"></div>
-    <div class="field"><label>End Date *</label><input id="plannerEndDate" type="date" value="${d.form.end}"></div>
+    <div class="field"><label>Start Date *</label><input id="plannerStartDate" type="date" min="${plannerTodayKey()}" value="${d.form.start}" onchange="syncPlannerEndDateMin()"></div>
+    <div class="field"><label>End Date *</label><input id="plannerEndDate" type="date" min="${d.form.start||plannerTodayKey()}" value="${d.form.end}"></div>
   </div>
   <div class="split">
     <div class="field"><label>Paper Start Time *</label><input id="plannerStartTime" type="time" value="${d.form.startTime}"></div>
@@ -351,9 +349,8 @@ function renderExamPlannerModal(){
     <label class="check"><input id="plannerIncludeSaturdays" type="checkbox" ${d.form.includeSaturdays?'checked':''}> Include Saturdays in examination planning (2nd Saturday remains excluded)</label>
     <div class="note">Sundays are always excluded.</div>
   </div>
-  <div class="section"><div class="sectitle">Study Leave / Breaks</div>
-    <div id="plannerBreakRows">${d.breaks.map((b,i)=>`<div class="planner-break-row"><div><label>Break Start Date</label><input type="date" value="${b.date}" onchange="updatePlannerBreak(${i},'date',this.value)"></div><div><label>Duration</label><select onchange="updatePlannerBreak(${i},'duration',this.value)">${plannerBreakDurationOptions(b.duration)}</select></div><div><label>Description</label><input value="${plannerEscape(b.description)}" oninput="updatePlannerBreakDescription(${i},this.value)"></div><button class="btn danger" type="button" onclick="removePlannerBreak(${i})">Remove</button></div>`).join('')}</div>
-    <button class="btn" type="button" onclick="addPlannerBreak()">+ ADD BREAK</button>
+  <div class="section"><div class="sectitle">Study Leave</div>
+    <div class="field" style="margin-bottom:0"><label>Days Between Exams</label><select id="plannerStudyLeaveDays"><option value="0" ${d.form.studyLeaveDays===0?'selected':''}>0 days</option>${Array.from({length:10},(_,i)=>{const days=i+1;return `<option value="${days}" ${d.form.studyLeaveDays===days?'selected':''}>${days} day${days===1?'':'s'}</option>`}).join('')}</select><div class="note">The system will automatically keep the selected number of study-leave days between exams for each class.</div></div>
   </div>
   <div class="section"><div class="sectitle">3. Select Classes</div>
     <div class="planner-controls" style="margin-bottom:9px"><button class="btn" type="button" onclick="selectAllPlannerClasses()">SELECT ALL</button><button class="btn" type="button" onclick="clearPlannerClasses()">CLEAR ALL</button></div>
@@ -380,47 +377,39 @@ function clearPlannerClasses(){const d=window.examPlannerDraft;if(!d)return;d.se
 function togglePlannerSubject(id,checked){const d=window.examPlannerDraft;if(!d)return;checked?d.selectedSubjects.add(id):d.selectedSubjects.delete(id);renderExamPlannerModal()}
 function selectAllPlannerSubjects(){const d=window.examPlannerDraft;if(!d)return;d.subjects.filter(s=>d.selectedClasses.has(s.class_id)).forEach(s=>d.selectedSubjects.add(s.id));renderExamPlannerModal()}
 function clearPlannerSubjects(){const d=window.examPlannerDraft;if(!d)return;d.selectedSubjects.clear();renderExamPlannerModal()}
-function plannerBreakDurationOptions(value){const selected=Math.max(1,Math.min(10,Number(value)||1));return Array.from({length:10},(_,i)=>{const days=i+1;return `<option value="${days}" ${days===selected?'selected':''}>${days} day${days===1?'':'s'}</option>`}).join('')}
-function addPlannerBreak(){const d=window.examPlannerDraft;if(!d)return;d.breaks.push({date:'',duration:1,description:'Study Leave'});renderExamPlannerModal()}
-function updatePlannerBreak(i,field,value){const b=window.examPlannerDraft?.breaks[i];if(!b)return;if(field==='duration')b.duration=Math.max(1,Math.min(10,Number(value)||1));else b.date=value}
-function updatePlannerBreakDescription(i,value){if(window.examPlannerDraft?.breaks[i])window.examPlannerDraft.breaks[i].description=value}
-function removePlannerBreak(i){if(!window.examPlannerDraft)return;window.examPlannerDraft.breaks.splice(i,1);renderExamPlannerModal()}
+function plannerTodayKey(){return plannerDateKey(new Date())}
+function syncPlannerEndDateMin(){const start=document.getElementById('plannerStartDate')?.value||plannerTodayKey(),end=document.getElementById('plannerEndDate');if(!end)return;end.min=start;if(end.value&&end.value<start)end.value=start}
+function plannerSpacedDates(available,count,gap){if(count<=0)return[];const step=gap+1,minRequired=1+(count-1)*step;if(minRequired>available.length)return null;const slots=count-1,extras=Array.from({length:slots},()=>0);for(let i=0;i<available.length-minRequired;i++){if(slots)extras[Math.floor(Math.random()*slots)]++}const dates=[available[0]];let index=0;for(let i=0;i<slots;i++){index+=step+extras[i];dates.push(available[index])}return dates}
 async function generateExamPlannerDb(){
   const d=window.examPlannerDraft;if(!d)return;
   const name=document.getElementById('plannerExamName')?.value.trim();
   const start=document.getElementById('plannerStartDate')?.value,end=document.getElementById('plannerEndDate')?.value;
+  const today=plannerTodayKey(),studyLeaveDays=Math.max(0,Math.min(10,Number(document.getElementById('plannerStudyLeaveDays')?.value||0)));
   const startTime=document.getElementById('plannerStartTime')?.value,endTime=document.getElementById('plannerEndTime')?.value;
   const includeSaturdays=!!document.getElementById('plannerIncludeSaturdays')?.checked;
   if(!name)return toast('Exam Name is required.');
   if(!start||!end)return toast('Start Date and End Date are required.');
+  if(start<today)return toast('Start Date cannot be earlier than today.');
   if(end<start)return toast('End Date must be on or after Start Date.');
   if(!startTime||!endTime||endTime<=startTime)return toast('Paper End Time must be after Start Time.');
   if(!d.selectedClasses.size)return toast('Select at least one class.');
   if(!d.selectedSubjects.size)return toast('Select at least one subject.');
-  const breaks=[];const seenBreaks=new Set();for(const b of d.breaks){if(!b.date)continue;const duration=Math.max(1,Math.min(10,Number(b.duration)||1));for(let offset=0;offset<duration;offset++){const dateObj=plannerLocalDate(b.date);dateObj.setDate(dateObj.getDate()+offset);const date=plannerDateKey(dateObj);if(date<start||date>end)return toast('Every break duration must remain within the examination period.');if(seenBreaks.has(date))return toast('Break periods cannot overlap.');seenBreaks.add(date);breaks.push({date,description:b.description?.trim()||'Study Leave'})}}
-  const breakSet=new Set(breaks.map(x=>x.date)),available=plannerAvailableDates(start,end,includeSaturdays,breakSet);
+  const breaks=[],breakSet=new Set(),available=plannerAvailableDates(start,end,includeSaturdays,breakSet);
   if(!available.length)return toast('No available examination dates match the selected planning rules.');
   const selectedSubjects=d.subjects.filter(s=>d.selectedSubjects.has(s.id)&&d.selectedClasses.has(s.class_id));
   const byClass=new Map();
   selectedSubjects.forEach(s=>{if(!byClass.has(s.class_id))byClass.set(s.class_id,[]);byClass.get(s.class_id).push(s)});
-  for(const [classId,subs] of byClass){if(subs.length>available.length)return toast(`Class ${d.classes.find(c=>c.id===classId)?.class_number||''} has ${subs.length} selected subjects but only ${available.length} available exam days.`)}
-  const pending=plannerShuffle(selectedSubjects);
-  const assignments=[],usedByClass=new Map();
-  for(const subject of pending){
-    const used=usedByClass.get(subject.class_id)||new Set();
-    const candidates=available.filter(date=>!used.has(date));
-    if(!candidates.length)return toast('Unable to distribute all selected subjects without placing two exams for the same class on one day. Try a longer exam period or fewer subjects.');
-    const load=candidates.map(date=>({date,load:assignments.filter(x=>x.class_id===subject.class_id&&x.exam_date===date).length})).sort((a,b)=>a.load-b.load);
-    const minLoad=load[0].load,tied=load.filter(x=>x.load===minLoad).map(x=>x.date),date=tied[Math.floor(Math.random()*tied.length)];
-    assignments.push({class_id:subject.class_id,subject_id:subject.id,exam_date:date});
-    used.add(date);usedByClass.set(subject.class_id,used);
+  const assignments=[];
+  for(const [classId,subs] of byClass){
+    const dates=plannerSpacedDates(available,subs.length,studyLeaveDays);
+    if(!dates)return toast(`Class ${d.classes.find(c=>c.id===classId)?.class_number||''} has ${subs.length} selected subjects but the selected exam period does not allow ${studyLeaveDays} study-leave day${studyLeaveDays===1?'':'s'} between every exam.`);
+    const subjects=plannerShuffle(subs);
+    subjects.forEach((subject,index)=>assignments.push({class_id:subject.class_id,subject_id:subject.id,exam_date:dates[index]}));
   }
   try{
-    const examInsert=await db.from('sc_exams').insert({school_id:APP.schoolId,session_id:APP.sessionId,exam_name:name,start_date:start,end_date:end,paper_start_time:startTime,paper_end_time:endTime,include_saturdays:includeSaturdays,status:'Draft'}).select('id').single();
+    const examInsert=await db.from('sc_exams').insert({school_id:APP.schoolId,session_id:APP.sessionId,exam_name:name,start_date:start,end_date:end,paper_start_time:startTime,paper_end_time:endTime,include_saturdays:includeSaturdays,study_leave_days:studyLeaveDays,status:'Draft'}).select('id').single();
     if(examInsert.error)throw examInsert.error;
     const examId=examInsert.data.id;
-    const breakRows=breaks.map(b=>({school_id:APP.schoolId,exam_id:examId,break_date:b.date,description:b.description}));
-    if(breakRows.length){const br=await db.from('sc_exam_breaks').insert(breakRows);if(br.error)throw br.error}
     const scheduleRows=assignments.map(x=>({school_id:APP.schoolId,exam_id:examId,class_id:x.class_id,subject_id:x.subject_id,exam_date:x.exam_date}));
     const sr=await db.from('sc_exam_schedules').insert(scheduleRows);if(sr.error)throw sr.error;
     await logHistory('Created','Exam',examId,name+' exam plan created');
@@ -443,7 +432,7 @@ async function openExamCalendarDb(examId){
 }
 function examCalendarValidation(){
   const p=window.activeExamPlanner;if(!p)return{conflicts:new Set(),messages:[]};
-  const byClassDate=new Map(),conflicts=new Set(),messages=[],validDates=new Set(plannerAvailableDates(p.exam.start_date,p.exam.end_date,p.exam.include_saturdays,new Set(p.breaks.map(x=>x.break_date))));
+  const byClassDate=new Map(),conflicts=new Set(),messages=[],validDatesArray=plannerAvailableDates(p.exam.start_date,p.exam.end_date,p.exam.include_saturdays,new Set(p.breaks.map(x=>x.break_date))),validDates=new Set(validDatesArray);
   p.schedules.forEach(x=>{
     const key=x.class_id+'|'+x.exam_date;
     if(!byClassDate.has(key))byClassDate.set(key,[]);
@@ -452,6 +441,9 @@ function examCalendarValidation(){
     else if(!validDates.has(x.exam_date)){conflicts.add(x.id);messages.push('An exam is scheduled on an excluded date: '+plannerDateLabel(x.exam_date)+'.')}
   });
   byClassDate.forEach((items,key)=>{if(items.length>1){items.forEach(x=>conflicts.add(x.id));const [classId,date]=key.split('|');const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} has ${items.length} exams on ${plannerDateLabel(date)}.`)}});
+  const studyLeaveDays=Math.max(0,Number(p.exam.study_leave_days||0)),dateIndex=new Map(validDatesArray.map((date,index)=>[date,index]));
+  const schedulesByClass=new Map();p.schedules.forEach(x=>{if(!schedulesByClass.has(x.class_id))schedulesByClass.set(x.class_id,[]);schedulesByClass.get(x.class_id).push(x)});
+  schedulesByClass.forEach((items,classId)=>{const ordered=[...items].filter(x=>dateIndex.has(x.exam_date)).sort((a,b)=>dateIndex.get(a.exam_date)-dateIndex.get(b.exam_date));for(let i=1;i<ordered.length;i++){const gap=dateIndex.get(ordered[i].exam_date)-dateIndex.get(ordered[i-1].exam_date)-1;if(gap<studyLeaveDays){conflicts.add(ordered[i-1].id);conflicts.add(ordered[i].id);const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} needs ${studyLeaveDays} study-leave day${studyLeaveDays===1?'':'s'} between exams.`)}}});
   return{conflicts,messages:[...new Set(messages)]};
 }
 async function publishActiveExam(){
@@ -480,7 +472,7 @@ function renderExamCalendar(){
   const allDates=plannerAvailableDates(exam.start_date,exam.end_date,exam.include_saturdays,new Set(p.breaks.map(x=>x.break_date)));
   const availableSet=new Set(allDates);
   v.innerHTML=`<div class="top"><div><h1>${plannerEscape(exam.exam_name)}</h1><p>${plannerDateLabel(exam.start_date)} – ${plannerDateLabel(exam.end_date)} · ${String(exam.paper_start_time).slice(0,5)} – ${String(exam.paper_end_time).slice(0,5)} · ${exam.status}</p></div><div class="actions"><button class="btn" onclick="go('planner')">← EXAM PLANS</button><button class="btn" onclick="openExamSettingsDb()">EDIT RULES</button><button class="btn" onclick="validateActiveExam()">VALIDATE</button><button class="btn primary" onclick="publishActiveExam()">PUBLISH PLAN</button></div></div>
-  <div class="cards"><div class="card"><div class="label">Exam Entries</div><div class="metric">${p.schedules.length}</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">${new Set(p.schedules.map(x=>x.exam_date)).size}</div></div><div class="card"><div class="label">Study Leave</div><div class="metric">${p.breaks.length}</div></div><div class="card"><div class="label">Conflicts</div><div class="metric" id="plannerConflictMetric">${validation.conflicts.size}</div></div></div>
+  <div class="cards"><div class="card"><div class="label">Exam Entries</div><div class="metric">${p.schedules.length}</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">${new Set(p.schedules.map(x=>x.exam_date)).size}</div></div><div class="card"><div class="label">Study Leave</div><div class="metric">${Number(p.exam.study_leave_days||0)}</div><div class="note">Days between exams</div></div><div class="card"><div class="label">Conflicts</div><div class="metric" id="plannerConflictMetric">${validation.conflicts.size}</div></div></div>
   ${validation.messages.length?`<div class="card error-note"><b>Conflicts detected</b><div style="margin-top:5px">${validation.messages.map(x=>plannerEscape(x)).join('<br>')}</div></div>`:''}
   <div class="card"><div class="cardhead"><h2>Calendar</h2><span class="note">Drag an exam to another available date.</span></div>
     <div class="tablewrap"><div class="planner-grid">
@@ -524,17 +516,19 @@ function renderExamEditModal(){
   const e=window.examPlannerEdit;if(!e)return;
   openModal(`<div class="modalhead"><h2>Edit Planning Rules</h2><button class="x" onclick="closeModal()">×</button></div>
   <p>Changes to dates and planning rules do not automatically regenerate the existing calendar.</p>
-  <div class="split"><div class="field"><label>Start Date</label><input id="editExamStart" type="date" value="${e.start_date}"></div><div class="field"><label>End Date</label><input id="editExamEnd" type="date" value="${e.end_date}"></div></div>
+  <div class="split"><div class="field"><label>Start Date</label><input id="editExamStart" type="date" min="${plannerTodayKey()}" value="${e.start_date}" onchange="syncEditExamEndDateMin()"></div><div class="field"><label>End Date</label><input id="editExamEnd" type="date" min="${e.start_date||plannerTodayKey()}" value="${e.end_date}"></div></div>
   <div class="split"><div class="field"><label>Paper Start Time</label><input id="editExamStartTime" type="time" value="${String(e.paper_start_time).slice(0,5)}"></div><div class="field"><label>Paper End Time</label><input id="editExamEndTime" type="time" value="${String(e.paper_end_time).slice(0,5)}"></div></div>
+  <div class="field"><label>Study Leave Between Exams</label><select id="editExamStudyLeave">${Array.from({length:11},(_,i)=>`<option value="${i}" ${Number(e.study_leave_days||0)===i?'selected':''}>${i} day${i===1?'':'s'}</option>`).join('')}</select><div class="note">The selected number of study-leave days is enforced between exams for each class.</div></div>
   <label class="check"><input id="editExamSaturday" type="checkbox" ${e.include_saturdays?'checked':''}> Include Saturdays (2nd Saturday remains excluded)</label>
   <div style="text-align:right;margin-top:18px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveExamSettingsDb()">SAVE</button></div>`);
 }
+async function syncEditExamEndDateMin(){const start=document.getElementById('editExamStart')?.value||plannerTodayKey(),end=document.getElementById('editExamEnd');if(!end)return;end.min=start;if(end.value&&end.value<start)end.value=start}
 async function saveExamSettingsDb(){
   const p=window.activeExamPlanner;if(!p)return;
-  const start=document.getElementById('editExamStart').value,end=document.getElementById('editExamEnd').value,st=document.getElementById('editExamStartTime').value,et=document.getElementById('editExamEndTime').value,inc=document.getElementById('editExamSaturday').checked;
-  if(!start||!end||end<start)return toast('Invalid examination dates.');
+  const start=document.getElementById('editExamStart').value,end=document.getElementById('editExamEnd').value,st=document.getElementById('editExamStartTime').value,et=document.getElementById('editExamEndTime').value,inc=document.getElementById('editExamSaturday').checked,studyLeaveDays=Math.max(0,Math.min(10,Number(document.getElementById('editExamStudyLeave').value||0)));
+  if(!start||!end||start<plannerTodayKey()||end<start)return toast('Invalid examination dates.');
   if(!st||!et||et<=st)return toast('Paper End Time must be after Start Time.');
-  const result=await db.from('sc_exams').update({start_date:start,end_date:end,paper_start_time:st,paper_end_time:et,include_saturdays:inc}).eq('id',p.exam.id).eq('school_id',APP.schoolId);
+  const result=await db.from('sc_exams').update({start_date:start,end_date:end,paper_start_time:st,paper_end_time:et,include_saturdays:inc,study_leave_days:studyLeaveDays}).eq('id',p.exam.id).eq('school_id',APP.schoolId);
   if(result.error)return toast(result.error.message);
   closeModal();await openExamCalendarDb(p.exam.id);toast('Planning rules updated');
 }
