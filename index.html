@@ -106,8 +106,52 @@ async function deleteRoomDb(id,name){if(!confirm('Delete '+name+'? This cannot b
 
 function subjectsHtml(rows){return `<div class="top"><div><h1>Subjects</h1><p>Maintain class-wise subjects and assign roll numbers by subject.</p></div><div class="actions"><button class="btn" onclick="downloadSubjectTemplate()">↓ DOWNLOAD TEMPLATE</button><label class="btn primary" for="subjectFile">↑ UPLOAD EXCEL FILE</label><input id="subjectFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this,'subjects')"><button class="btn danger" onclick="deleteAllSubjectsDb()">DELETE ALL SUBJECTS</button><button class="btn primary" onclick="subjectModalDb()">+ ADD SUBJECT</button></div></div><div class="searchbar"><input placeholder="Search subject or class..." oninput="filterRows(this,'subjectTable')"></div><div class="tablewrap"><table class="table" id="subjectTable"><thead><tr><th>Class</th><th>Subject</th><th>Assigned / Total</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr><td>Class ${r.sc_classes?.class_number||'—'}</td><td>${r.subject_name}</td><td>${r.roll_assigned||0} / ${r.roll_total||0}</td><td class="${r.status==='Active'?'dotgood':''}">${r.status}</td><td class="actions-cell"><button class="btn" onclick="subjectModalDb('${r.id}',${r.sc_classes?.class_number||1})">Edit</button> <button class="btn" onclick="assignRollsDb('${r.id}',${r.sc_classes?.class_number||1},'${String(r.subject_name).replace(/'/g,"&#39;")}')">Assign Rolls</button> <button class="btn danger" style="margin-left:5px" onclick="deleteSubjectDb('${r.id}','${String(r.subject_name).replace(/'/g,"&#39;")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:#6d778b;padding:25px">No subjects configured yet.</td></tr>'}</tbody></table></div>`}
 
-async function loadSubjects(){const v=document.getElementById('view');v.innerHTML='<div class="card">Loading subjects…</div>';const [subjectsRes,sectionsRes,rollsRes]=await Promise.all([db.from('sc_subjects').select('*,sc_classes(class_number)').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).order('subject_name'),db.from('sc_sections').select('id,class_id,student_count').eq('school_id',APP.schoolId),db.from('sc_subject_rolls').select('subject_id,section_id,roll_number').eq('school_id',APP.schoolId)]);if(subjectsRes.error)return v.innerHTML=`<div class="card error-note">${subjectsRes.error.message}</div>`;if(sectionsRes.error)return v.innerHTML=`<div class="card error-note">${sectionsRes.error.message}</div>`;if(rollsRes.error)return v.innerHTML=`<div class="card error-note">${rollsRes.error.message}</div>`;const assignedBySubject=new Map();(rollsRes.data||[]).forEach(x=>assignedBySubject.set(x.subject_id,(assignedBySubject.get(x.subject_id)||0)+1));const sorted=(subjectsRes.data||[]).map(r=>{const sections=(sectionsRes.data||[]).filter(x=>x.class_id===r.class_id);return {...r,roll_assigned:assignedBySubject.get(r.id)||0,roll_total:sections.reduce((sum,x)=>sum+Number(x.student_count||0),0)}}).sort((a,b)=>(Number(a.sc_classes?.class_number||99)-Number(b.sc_classes?.class_number||99))||String(a.subject_name||'').localeCompare(String(b.subject_name||'')));v.innerHTML=subjectsHtml(sorted)}
+async function loadSubjectRollCountsDb(){
+  const assignedBySubject=new Map();
+  const pageSize=1000;
+  let from=0;
+  while(true){
+    const result=await db.from('sc_subject_rolls')
+      .select('subject_id')
+      .eq('school_id',APP.schoolId)
+      .range(from,from+pageSize-1);
+    if(result.error)throw result.error;
+    const rows=result.data||[];
+    rows.forEach(x=>assignedBySubject.set(x.subject_id,(assignedBySubject.get(x.subject_id)||0)+1));
+    if(rows.length<pageSize)break;
+    from+=pageSize;
+  }
+  return assignedBySubject;
+}
 
+async function loadSubjects(){
+  const v=document.getElementById('view');
+  v.innerHTML='<div class="card">Loading subjects…</div>';
+  try{
+    const [subjectsRes,sectionsRes,assignedBySubject]=await Promise.all([
+      db.from('sc_subjects').select('*,sc_classes(class_number)').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).order('subject_name'),
+      db.from('sc_sections').select('id,class_id,student_count').eq('school_id',APP.schoolId),
+      loadSubjectRollCountsDb()
+    ]);
+    if(subjectsRes.error)throw subjectsRes.error;
+    if(sectionsRes.error)throw sectionsRes.error;
+    const sorted=(subjectsRes.data||[]).map(r=>{
+      const sections=(sectionsRes.data||[]).filter(x=>x.class_id===r.class_id);
+      return {
+        ...r,
+        roll_assigned:assignedBySubject.get(r.id)||0,
+        roll_total:sections.reduce((sum,x)=>sum+Number(x.student_count||0),0)
+      };
+    }).sort((a,b)=>
+      (Number(a.sc_classes?.class_number||99)-Number(b.sc_classes?.class_number||99))||
+      String(a.subject_name||'').localeCompare(String(b.subject_name||''))
+    );
+    v.innerHTML=subjectsHtml(sorted);
+  }catch(e){
+    console.error('loadSubjects failed',e);
+    v.innerHTML=`<div class="card error-note">${e.message||'Unable to load subjects'}</div>`;
+  }
+}
 function downloadSubjectTemplate(){if(!window.XLSX)return toast('Excel library is still loading. Please try again.');const rows=[['Class','Subject','Status'],[1,'English','Active'],[1,'Mathematics','Active'],[10,'Science','Active']];const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:12},{wch:25},{wch:14}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Subjects');XLSX.writeFile(wb,'SeatChart-Subjects-Template.xlsx')}
 
 async function subjectModalDb(id,classNo){if(id)return editSubjectModalDb(id);return addSubjectsModalDb()}
