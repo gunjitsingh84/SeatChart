@@ -379,7 +379,7 @@ function selectAllPlannerSubjects(){const d=window.examPlannerDraft;if(!d)return
 function clearPlannerSubjects(){const d=window.examPlannerDraft;if(!d)return;d.selectedSubjects.clear();renderExamPlannerModal()}
 function plannerTodayKey(){return plannerDateKey(new Date())}
 function syncPlannerEndDateMin(){const start=document.getElementById('plannerStartDate')?.value||plannerTodayKey(),end=document.getElementById('plannerEndDate');if(!end)return;end.min=start;if(end.value&&end.value<start)end.value=start}
-function plannerSpacedDates(available,count,gap){if(count<=0)return[];const step=gap+1,minRequired=1+(count-1)*step;if(minRequired>available.length)return null;const slots=count-1,extras=Array.from({length:slots},()=>0);for(let i=0;i<available.length-minRequired;i++){if(slots)extras[Math.floor(Math.random()*slots)]++}const dates=[available[0]];let index=0;for(let i=0;i<slots;i++){index+=step+extras[i];dates.push(available[index])}return dates}
+function plannerSpacedDates(available,count,gap){if(count<=0)return[];const step=gap+1,minRequired=1+(count-1)*step;if(minRequired>available.length)return null;const dates=[];for(let i=0;i<count;i++)dates.push(available[i*step]);return dates}
 async function generateExamPlannerDb(){
   const d=window.examPlannerDraft;if(!d)return;
   const name=document.getElementById('plannerExamName')?.value.trim();
@@ -443,7 +443,7 @@ function examCalendarValidation(){
   byClassDate.forEach((items,key)=>{if(items.length>1){items.forEach(x=>conflicts.add(x.id));const [classId,date]=key.split('|');const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} has ${items.length} exams on ${plannerDateLabel(date)}.`)}});
   const studyLeaveDays=Math.max(0,Number(p.exam.study_leave_days||0)),dateIndex=new Map(validDatesArray.map((date,index)=>[date,index]));
   const schedulesByClass=new Map();p.schedules.forEach(x=>{if(!schedulesByClass.has(x.class_id))schedulesByClass.set(x.class_id,[]);schedulesByClass.get(x.class_id).push(x)});
-  schedulesByClass.forEach((items,classId)=>{const ordered=[...items].filter(x=>dateIndex.has(x.exam_date)).sort((a,b)=>dateIndex.get(a.exam_date)-dateIndex.get(b.exam_date));for(let i=1;i<ordered.length;i++){const gap=dateIndex.get(ordered[i].exam_date)-dateIndex.get(ordered[i-1].exam_date)-1;if(gap<studyLeaveDays){conflicts.add(ordered[i-1].id);conflicts.add(ordered[i].id);const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} needs ${studyLeaveDays} study-leave day${studyLeaveDays===1?'':'s'} between exams.`)}}});
+  schedulesByClass.forEach((items,classId)=>{const ordered=[...items].filter(x=>dateIndex.has(x.exam_date)).sort((a,b)=>dateIndex.get(a.exam_date)-dateIndex.get(b.exam_date));for(let i=1;i<ordered.length;i++){const gap=dateIndex.get(ordered[i].exam_date)-dateIndex.get(ordered[i-1].exam_date)-1;if(gap!==studyLeaveDays){conflicts.add(ordered[i-1].id);conflicts.add(ordered[i].id);const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} must have exactly ${studyLeaveDays} study-leave day${studyLeaveDays===1?'':'s'} between exams.`)}}});
   return{conflicts,messages:[...new Set(messages)]};
 }
 async function publishActiveExam(){
