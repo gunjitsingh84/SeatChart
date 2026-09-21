@@ -151,22 +151,22 @@ async function assignRollsDb(subjectId,classNo,subjectName){
 function renderAssignRollsModal(){
   const s=window.rollAssignmentState;if(!s)return;
   const total=s.sections.reduce((sum,x)=>sum+Number(x.student_count||0),0),assigned=s.sections.reduce((sum,x)=>sum+(s.selected.get(x.id)?.size||0),0);
-  openModal(\`<div class="modalhead"><h2>Assign Rolls</h2><button class="x" onclick="closeModal()">×</button></div>
-  <p><b>Class \${s.classNo}</b> · \${s.subjectName}<br>Assign roll numbers section by section. Rolls start from 1 for every section.</p>
-  <div class="card" style="padding:12px;margin-bottom:14px;background:#f8faff"><div class="label">Assignment Summary</div><div style="font-size:11px;margin-top:5px"><b>\${assigned}</b> of <b>\${total}</b> rolls selected</div></div>
-  \${s.sections.map(section=>{
+  openModal(`<div class="modalhead"><h2>Assign Rolls</h2><button class="x" onclick="closeModal()">×</button></div>
+  <p><b>Class ${s.classNo}</b> · ${s.subjectName}<br>Assign roll numbers section by section. Rolls start from 1 for every section.</p>
+  <div class="card" style="padding:12px;margin-bottom:14px;background:#f8faff"><div class="label">Assignment Summary</div><div style="font-size:11px;margin-top:5px"><b>${assigned}</b> of <b>${total}</b> rolls selected</div></div>
+  ${s.sections.map(section=>{
     const count=Number(section.student_count||0),selected=s.selected.get(section.id)||new Set();
-    return \`<div class="section" style="padding-top:14px;margin-top:14px">
+    return `<div class="section" style="padding-top:14px;margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
-        <div><div style="font-weight:800;font-size:12px">Section \${section.section_name}</div><div style="font-size:9px;color:#6d778b">\${count} students · \${selected.size} rolls selected</div></div>
-        <div class="roll-tools" style="margin:0"><button class="btn" type="button" onclick="assignAllSectionRolls('\${section.id}')">ASSIGN ALL</button><button class="btn" type="button" onclick="deselectAllSectionRolls('\${section.id}')">DESELECT ALL</button></div>
+        <div><div style="font-weight:800;font-size:12px">Section ${section.section_name}</div><div style="font-size:9px;color:#6d778b">${count} students · ${selected.size} rolls selected</div></div>
+        <div class="roll-tools" style="margin:0"><button class="btn" type="button" onclick="assignAllSectionRolls('${section.id}')">ASSIGN ALL</button><button class="btn" type="button" onclick="deselectAllSectionRolls('${section.id}')">DESELECT ALL</button></div>
       </div>
-      <div class="roll-grid">\${Array.from({length:count},(_,i)=>{
+      <div class="roll-grid">${Array.from({length:count},(_,i)=>{
         const roll=i+1,checked=selected.has(roll);
-        return \`<label class="roll-check" style="display:flex;justify-content:center"><input type="checkbox" \${checked?'checked':''} onchange="toggleSectionRoll('\${section.id}',\${roll},this.checked)" style="display:none"><span style="width:42px;height:38px;border:1px solid \${checked?'#2457d6':'#d9dee7'};background:\${checked?'#edf2ff':'#fff'};color:\${checked?'#2457d6':'#7b869a'};border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:800;cursor:pointer">\${roll}</span></label>\`;
-      }).join('')}</div></div>\`;
+        return `<label class="roll-check" style="display:flex;justify-content:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleSectionRoll('${section.id}',${roll},this.checked)" style="display:none"><span style="width:42px;height:38px;border:1px solid ${checked?'#2457d6':'#d9dee7'};background:${checked?'#edf2ff':'#fff'};color:${checked?'#2457d6':'#7b869a'};border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:800;cursor:pointer">${roll}</span></label>`;
+      }).join('')}</div></div>`;
   }).join('')}
-  <div style="text-align:right;margin-top:18px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveRollAssignmentsDb()">SAVE ASSIGNMENTS</button></div>\`);
+  <div style="text-align:right;margin-top:18px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveRollAssignmentsDb()">SAVE ASSIGNMENTS</button></div>`);
 }
 function toggleSectionRoll(sectionId,roll,checked){
   const s=window.rollAssignmentState;if(!s)return;const selected=s.selected.get(sectionId)||new Set();checked?selected.add(roll):selected.delete(roll);s.selected.set(sectionId,selected);renderAssignRollsModal();
@@ -188,7 +188,7 @@ async function saveRollAssignmentsDb(){
     for(const row of existing)if(!desiredKeys.has(row.section_id+'|'+row.roll_number)){const result=await db.from('sc_subject_rolls').delete().eq('id',row.id).eq('school_id',APP.schoolId);if(result.error)throw result.error}
     const existingKeys=new Set(existing.map(x=>x.section_id+'|'+x.roll_number)),additions=desired.filter(x=>!existingKeys.has(x.section_id+'|'+x.roll_number));
     if(additions.length){const result=await db.from('sc_subject_rolls').insert(additions);if(result.error)throw result.error}
-    await logHistory('Updated','Subject Rolls',s.subjectId,\`Roll assignments updated for Class \${s.classNo} \${s.subjectName}\`);
+    await logHistory('Updated','Subject Rolls',s.subjectId,`Roll assignments updated for Class ${s.classNo} ${s.subjectName}`);
     closeModal();toast('Roll assignments saved');
   }catch(e){console.error('saveRollAssignmentsDb failed',e);toast(e.message||'Unable to save roll assignments')}
 }
