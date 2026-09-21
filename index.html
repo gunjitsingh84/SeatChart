@@ -200,12 +200,24 @@ async function assignRollsDb(subjectId,classNo,subjectName){
     if(rollsRes.error)return toast(rollsRes.error.message);
     const sections=sectionsRes.data||[];
     if(!sections.length)return toast('No sections are configured for Class '+classNo+'.');
-    const existing=rollsRes.data||[],hasSavedRolls=new Set(existing.map(x=>x.section_id));
+    const existing=rollsRes.data||[];
+    const hasAnySavedRolls=existing.length>0;
+    const savedBySection=new Map();
+    existing.forEach(x=>{
+      if(!savedBySection.has(x.section_id))savedBySection.set(x.section_id,new Set());
+      savedBySection.get(x.section_id).add(Number(x.roll_number));
+    });
     window.rollAssignmentState={subjectId,classNo,subjectName,sections,selected:new Map()};
     sections.forEach(section=>{
-      const selected=new Set(),count=Number(section.student_count||0);
-      for(let roll=1;roll<=count;roll++){
-        if(!hasSavedRolls.has(section.id)||existing.some(x=>x.section_id===section.id&&Number(x.roll_number)===roll))selected.add(roll);
+      const count=Number(section.student_count||0);
+      const saved=savedBySection.get(section.id);
+      const selected=new Set();
+      if(!hasAnySavedRolls){
+        for(let roll=1;roll<=count;roll++)selected.add(roll);
+      }else if(saved){
+        saved.forEach(roll=>{
+          if(roll>=1&&roll<=count)selected.add(roll);
+        });
       }
       window.rollAssignmentState.selected.set(section.id,selected);
     });
