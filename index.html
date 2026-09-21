@@ -104,7 +104,7 @@ async function saveRoomDb(id){const payload={school_id:APP.schoolId,session_id:A
 
 async function deleteRoomDb(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;const e=await db.from('sc_rooms').delete().eq('id',id);if(e.error)return toast(e.error.message);await logHistory('Deleted','Room',id,name+' deleted');toast(name+' deleted');loadRooms()}
 
-function subjectsHtml(rows){return `<div class="top"><div><h1>Subjects</h1><p>Maintain class-wise subjects and assign roll numbers by subject.</p></div><div class="actions"><button class="btn" onclick="downloadSubjectTemplate()">↓ DOWNLOAD TEMPLATE</button><label class="btn primary" for="subjectFile">↑ UPLOAD EXCEL FILE</label><input id="subjectFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this,'subjects')"><button class="btn danger" onclick="deleteAllSubjectsDb()">DELETE ALL SUBJECTS</button><button class="btn primary" onclick="subjectModalDb()">+ ADD SUBJECT</button></div></div><div class="searchbar"><input placeholder="Search subject or class..." oninput="filterRows(this,'subjectTable')"></div><div class="tablewrap"><table class="table" id="subjectTable"><thead><tr><th>Class</th><th>Subject</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr><td>Class ${r.sc_classes?.class_number||'—'}</td><td>${r.subject_name}</td><td class="${r.status==='Active'?'dotgood':''}">${r.status}</td><td class="actions-cell"><button class="btn" onclick="subjectModalDb('${r.id}',${r.sc_classes?.class_number||1})">Edit</button> <button class="btn" onclick="assignRollsDb('${r.id}',${r.sc_classes?.class_number||1},'${String(r.subject_name).replace(/'/g,"&#39;")}')">Rolls</button> <button class="btn danger" style="margin-left:5px" onclick="deleteSubjectDb('${r.id}','${String(r.subject_name).replace(/'/g,"&#39;")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:#6d778b;padding:25px">No subjects configured yet.</td></tr>'}</tbody></table></div>`}
+function subjectsHtml(rows){return `<div class="top"><div><h1>Subjects</h1><p>Maintain class-wise subjects and assign roll numbers by subject.</p></div><div class="actions"><button class="btn" onclick="downloadSubjectTemplate()">↓ DOWNLOAD TEMPLATE</button><label class="btn primary" for="subjectFile">↑ UPLOAD EXCEL FILE</label><input id="subjectFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this,'subjects')"><button class="btn danger" onclick="deleteAllSubjectsDb()">DELETE ALL SUBJECTS</button><button class="btn primary" onclick="subjectModalDb()">+ ADD SUBJECT</button></div></div><div class="searchbar"><input placeholder="Search subject or class..." oninput="filterRows(this,'subjectTable')"></div><div class="tablewrap"><table class="table" id="subjectTable"><thead><tr><th>Class</th><th>Subject</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr><td>Class ${r.sc_classes?.class_number||'—'}</td><td>${r.subject_name}</td><td class="${r.status==='Active'?'dotgood':''}">${r.status}</td><td class="actions-cell"><button class="btn" onclick="subjectModalDb('${r.id}',${r.sc_classes?.class_number||1})">Edit</button> <button class="btn" onclick="assignRollsDb('${r.id}',${r.sc_classes?.class_number||1},'${String(r.subject_name).replace(/'/g,"&#39;")}')">Assign Rolls</button> <button class="btn danger" style="margin-left:5px" onclick="deleteSubjectDb('${r.id}','${String(r.subject_name).replace(/'/g,"&#39;")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:#6d778b;padding:25px">No subjects configured yet.</td></tr>'}</tbody></table></div>`}
 
 async function loadSubjects(){const v=document.getElementById('view');v.innerHTML='<div class="card">Loading subjects…</div>';const {data,error}=await db.from('sc_subjects').select('*,sc_classes(class_number)').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).order('subject_name');if(error)return v.innerHTML=`<div class="card error-note">${error.message}</div>`;const sorted=(data||[]).slice().sort((a,b)=>(Number(a.sc_classes?.class_number||99)-Number(b.sc_classes?.class_number||99))||String(a.subject_name||'').localeCompare(String(b.subject_name||'')));v.innerHTML=subjectsHtml(sorted)}
 
@@ -123,6 +123,75 @@ function addSubjectFormRow(){const mode=window.subjectFormMode||'add';const rows
 
 async function saveSubjectDb(mode){const classId=document.getElementById('subjectBulkClass')?.value||'',nameEls=[...document.querySelectorAll('.subjectBulkName')],rows=[];if(!classId)return toast('Select a class.');for(let i=0;i<nameEls.length;i++){const name=nameEls[i].value.trim(),status=nameEls[i].dataset.status||'Active',id=nameEls[i].dataset.id||'';if(!name)continue;rows.push({id,name,status})}if(!rows.length)return toast('Add at least one subject.');const seen=new Set();for(const row of rows){const key=row.name.toLowerCase();if(seen.has(key))return toast('Duplicate subject found: '+row.name);seen.add(key)}const existing=await db.from('sc_subjects').select('id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).eq('class_id',classId);if(existing.error)return toast(existing.error.message);const editingIds=new Set(rows.filter(x=>x.id).map(x=>x.id));for(const row of rows){const conflict=(existing.data||[]).find(x=>String(x.subject_name||'').trim().toLowerCase()===row.name.toLowerCase()&&!editingIds.has(x.id));if(conflict)return toast('Subject already exists for this class: '+row.name)}for(const row of rows){const payload={school_id:APP.schoolId,session_id:APP.sessionId,class_id:classId,subject_name:row.name,status:row.status||'Active'};const result=row.id?await db.from('sc_subjects').update(payload).eq('id',row.id):await db.from('sc_subjects').insert(payload);if(result.error)return toast(result.error.message)}await logHistory(mode==='edit'?'Updated':'Created','Subjects',null,rows.length+' subject'+(rows.length===1?'':'s')+' saved for class');closeModal();toast(rows.length+' subject'+(rows.length===1?'':'s')+' saved');loadSubjects()}
 
+
+async function assignRollsDb(subjectId,classNo,subjectName){
+  try{
+    const subjectRes=await db.from('sc_subjects').select('id,class_id,subject_name').eq('id',subjectId).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).single();
+    if(subjectRes.error)return toast(subjectRes.error.message);
+    const [sectionsRes,rollsRes]=await Promise.all([
+      db.from('sc_sections').select('id,section_name,student_count').eq('school_id',APP.schoolId).eq('class_id',subjectRes.data.class_id).order('section_name'),
+      db.from('sc_subject_rolls').select('id,section_id,roll_number').eq('school_id',APP.schoolId).eq('subject_id',subjectId)
+    ]);
+    if(sectionsRes.error)return toast(sectionsRes.error.message);
+    if(rollsRes.error)return toast(rollsRes.error.message);
+    const sections=sectionsRes.data||[];
+    if(!sections.length)return toast('No sections are configured for Class '+classNo+'.');
+    const existing=rollsRes.data||[],hasSavedRolls=new Set(existing.map(x=>x.section_id));
+    window.rollAssignmentState={subjectId,classNo,subjectName,sections,selected:new Map()};
+    sections.forEach(section=>{
+      const selected=new Set(),count=Number(section.student_count||0);
+      for(let roll=1;roll<=count;roll++){
+        if(!hasSavedRolls.has(section.id)||existing.some(x=>x.section_id===section.id&&Number(x.roll_number)===roll))selected.add(roll);
+      }
+      window.rollAssignmentState.selected.set(section.id,selected);
+    });
+    renderAssignRollsModal();
+  }catch(e){console.error('assignRollsDb failed',e);toast(e.message||'Unable to load roll assignments')}
+}
+function renderAssignRollsModal(){
+  const s=window.rollAssignmentState;if(!s)return;
+  const total=s.sections.reduce((sum,x)=>sum+Number(x.student_count||0),0),assigned=s.sections.reduce((sum,x)=>sum+(s.selected.get(x.id)?.size||0),0);
+  openModal(\`<div class="modalhead"><h2>Assign Rolls</h2><button class="x" onclick="closeModal()">×</button></div>
+  <p><b>Class \${s.classNo}</b> · \${s.subjectName}<br>Assign roll numbers section by section. Rolls start from 1 for every section.</p>
+  <div class="card" style="padding:12px;margin-bottom:14px;background:#f8faff"><div class="label">Assignment Summary</div><div style="font-size:11px;margin-top:5px"><b>\${assigned}</b> of <b>\${total}</b> rolls selected</div></div>
+  \${s.sections.map(section=>{
+    const count=Number(section.student_count||0),selected=s.selected.get(section.id)||new Set();
+    return \`<div class="section" style="padding-top:14px;margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div><div style="font-weight:800;font-size:12px">Section \${section.section_name}</div><div style="font-size:9px;color:#6d778b">\${count} students · \${selected.size} rolls selected</div></div>
+        <div class="roll-tools" style="margin:0"><button class="btn" type="button" onclick="assignAllSectionRolls('\${section.id}')">ASSIGN ALL</button><button class="btn" type="button" onclick="deselectAllSectionRolls('\${section.id}')">DESELECT ALL</button></div>
+      </div>
+      <div class="roll-grid">\${Array.from({length:count},(_,i)=>{
+        const roll=i+1,checked=selected.has(roll);
+        return \`<label class="roll-check" style="display:flex;justify-content:center"><input type="checkbox" \${checked?'checked':''} onchange="toggleSectionRoll('\${section.id}',\${roll},this.checked)" style="display:none"><span style="width:42px;height:38px;border:1px solid \${checked?'#2457d6':'#d9dee7'};background:\${checked?'#edf2ff':'#fff'};color:\${checked?'#2457d6':'#7b869a'};border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:800;cursor:pointer">\${roll}</span></label>\`;
+      }).join('')}</div></div>\`;
+  }).join('')}
+  <div style="text-align:right;margin-top:18px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveRollAssignmentsDb()">SAVE ASSIGNMENTS</button></div>\`);
+}
+function toggleSectionRoll(sectionId,roll,checked){
+  const s=window.rollAssignmentState;if(!s)return;const selected=s.selected.get(sectionId)||new Set();checked?selected.add(roll):selected.delete(roll);s.selected.set(sectionId,selected);renderAssignRollsModal();
+}
+function assignAllSectionRolls(sectionId){
+  const s=window.rollAssignmentState;if(!s)return;const section=s.sections.find(x=>x.id===sectionId);if(!section)return;
+  const selected=new Set();for(let roll=1;roll<=Number(section.student_count||0);roll++)selected.add(roll);s.selected.set(sectionId,selected);renderAssignRollsModal();
+}
+function deselectAllSectionRolls(sectionId){
+  const s=window.rollAssignmentState;if(!s)return;s.selected.set(sectionId,new Set());renderAssignRollsModal();
+}
+async function saveRollAssignmentsDb(){
+  const s=window.rollAssignmentState;if(!s)return;
+  try{
+    const current=await db.from('sc_subject_rolls').select('id,section_id,roll_number').eq('school_id',APP.schoolId).eq('subject_id',s.subjectId);
+    if(current.error)return toast(current.error.message);
+    const desired=[];s.sections.forEach(section=>(s.selected.get(section.id)||new Set()).forEach(roll=>desired.push({school_id:APP.schoolId,subject_id:s.subjectId,section_id:section.id,roll_number:roll})));
+    const desiredKeys=new Set(desired.map(x=>x.section_id+'|'+x.roll_number)),existing=current.data||[];
+    for(const row of existing)if(!desiredKeys.has(row.section_id+'|'+row.roll_number)){const result=await db.from('sc_subject_rolls').delete().eq('id',row.id).eq('school_id',APP.schoolId);if(result.error)throw result.error}
+    const existingKeys=new Set(existing.map(x=>x.section_id+'|'+x.roll_number)),additions=desired.filter(x=>!existingKeys.has(x.section_id+'|'+x.roll_number));
+    if(additions.length){const result=await db.from('sc_subject_rolls').insert(additions);if(result.error)throw result.error}
+    await logHistory('Updated','Subject Rolls',s.subjectId,\`Roll assignments updated for Class \${s.classNo} \${s.subjectName}\`);
+    closeModal();toast('Roll assignments saved');
+  }catch(e){console.error('saveRollAssignmentsDb failed',e);toast(e.message||'Unable to save roll assignments')}
+}
 async function deleteSubjectDb(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;const rollCheck=await db.from('sc_subject_rolls').select('id',{count:'exact',head:true}).eq('subject_id',id);if(rollCheck.error)return toast(rollCheck.error.message);if((rollCheck.count||0)>0)return toast('This subject has roll assignments and cannot be deleted. Remove the roll assignments first.');const result=await db.from('sc_subjects').delete().eq('id',id);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subject',id,name+' deleted');toast(name+' deleted');loadSubjects()}
 async function deleteAllRoomsDb(){const check=await db.from('sc_rooms').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(check.error)return toast(check.error.message);const count=check.count||0;if(!count)return toast('No rooms to delete.');if(!confirm('Delete all '+count+' room records for the current session? This cannot be undone.'))return;const result=await db.from('sc_rooms').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(result.error)return toast(result.error.message);await logHistory('Deleted','Rooms',null,count+' room records deleted');toast(count+' room'+(count===1?'':'s')+' deleted');loadRooms()}
 async function deleteAllSubjectsDb(){const check=await db.from('sc_subjects').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(check.error)return toast(check.error.message);const count=check.count||0;if(!count)return toast('No subjects to delete.');if(!confirm('Delete all '+count+' subject records for the current session? This will also remove their roll assignments and cannot be undone.'))return;const rolls=await db.from('sc_subject_rolls').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(rolls.error)return toast(rolls.error.message);const result=await db.from('sc_subjects').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subjects',null,count+' subject records deleted');toast(count+' subject'+(count===1?'':'s')+' deleted');loadSubjects()}
