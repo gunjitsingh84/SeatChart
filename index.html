@@ -297,6 +297,20 @@ function plannerAvailableDates(startDate,endDate,includeSaturdays,breakSet){
   }
   return dates;
 }
+function plannerSpacedDates(available,count,gap){
+  if(count<=0)return[];
+  const dates=[];
+  let cursor=0;
+  for(let i=0;i<count;i++){
+    if(cursor>=available.length)return null;
+    const examDate=available[cursor];
+    const examDay=plannerLocalDate(examDate).getDay();
+    if(examDay===0)return null;
+    dates.push(examDate);
+    cursor+=gap+1;
+  }
+  return dates;
+}
 function plannerShuffle(arr){
   const a=[...arr];
   for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
