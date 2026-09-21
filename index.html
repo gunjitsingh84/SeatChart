@@ -330,24 +330,26 @@ async function createExamPlannerDb(){
 }
 function renderExamPlannerModal(){
   const d=window.examPlannerDraft;if(!d)return;
+  d.form=d.form||{name:'',type:'Annual Examination',start:'',end:'',startTime:'09:00',endTime:'12:00',includeSaturdays:false};
+  if(document.getElementById('plannerExamName')){d.form.name=document.getElementById('plannerExamName').value;d.form.type=document.getElementById('plannerExamType').value;d.form.start=document.getElementById('plannerStartDate').value;d.form.end=document.getElementById('plannerEndDate').value;d.form.startTime=document.getElementById('plannerStartTime').value;d.form.endTime=document.getElementById('plannerEndTime').value;d.form.includeSaturdays=document.getElementById('plannerIncludeSaturdays').checked;}
   const subjectByClass=new Map(d.subjects.map(s=>[s.class_id,s]));
   const selectedSubjectCount=d.selectedSubjects.size;
   openModal(`<div class="modalhead"><h2>Create Examination</h2><button class="x" onclick="closeModal()">×</button></div>
   <p>Set the examination period and rules. Subjects are selected automatically for each chosen class.</p>
   <div class="split">
-    <div class="field"><label>Exam Name *</label><input id="plannerExamName" placeholder="Annual Examination 2026–27"></div>
-    <div class="field"><label>Exam Type *</label><select id="plannerExamType"><option>Annual Examination</option><option>Half Yearly</option><option>Unit Test</option><option>Periodic Test</option><option>Pre-Board</option><option>Other</option></select></div>
+    <div class="field"><label>Exam Name *</label><input id="plannerExamName" value="${plannerEscape(d.form.name)}" placeholder="Annual Examination 2026–27"></div>
+    <div class="field"><label>Exam Type *</label><select id="plannerExamType"><option ${d.form.type==='Annual Examination'?'selected':''}>Annual Examination</option><option ${d.form.type==='Half Yearly'?'selected':''}>Half Yearly</option><option ${d.form.type==='Unit Test'?'selected':''}>Unit Test</option><option ${d.form.type==='Periodic Test'?'selected':''}>Periodic Test</option><option ${d.form.type==='Pre-Board'?'selected':''}>Pre-Board</option><option ${d.form.type==='Other'?'selected':''}>Other</option></select></div>
   </div>
   <div class="split">
-    <div class="field"><label>Start Date *</label><input id="plannerStartDate" type="date" onchange="renderExamPlannerModal()"></div>
-    <div class="field"><label>End Date *</label><input id="plannerEndDate" type="date" onchange="renderExamPlannerModal()"></div>
+    <div class="field"><label>Start Date *</label><input id="plannerStartDate" type="date" value="${d.form.start}"></div>
+    <div class="field"><label>End Date *</label><input id="plannerEndDate" type="date" value="${d.form.end}"></div>
   </div>
   <div class="split">
-    <div class="field"><label>Paper Start Time *</label><input id="plannerStartTime" type="time" value="09:00"></div>
-    <div class="field"><label>Paper End Time *</label><input id="plannerEndTime" type="time" value="12:00"></div>
+    <div class="field"><label>Paper Start Time *</label><input id="plannerStartTime" type="time" value="${d.form.startTime}"></div>
+    <div class="field"><label>Paper End Time *</label><input id="plannerEndTime" type="time" value="${d.form.endTime}"></div>
   </div>
   <div class="section"><div class="sectitle">Planning Rules</div>
-    <label class="check"><input id="plannerIncludeSaturdays" type="checkbox"> Include Saturdays in examination planning (2nd Saturday remains excluded)</label>
+    <label class="check"><input id="plannerIncludeSaturdays" type="checkbox" ${d.form.includeSaturdays?'checked':''}> Include Saturdays in examination planning (2nd Saturday remains excluded)</label>
     <div class="note">Sundays are always excluded.</div>
   </div>
   <div class="section"><div class="sectitle">Study Leave / Breaks</div>
@@ -442,10 +444,27 @@ async function openExamCalendarDb(examId){
 }
 function examCalendarValidation(){
   const p=window.activeExamPlanner;if(!p)return{conflicts:new Set(),messages:[]};
-  const byClassDate=new Map(),conflicts=new Set(),messages=[];
-  p.schedules.forEach(x=>{const key=x.class_id+'|'+x.exam_date;if(!byClassDate.has(key))byClassDate.set(key,[]);byClassDate.get(key).push(x)});
+  const byClassDate=new Map(),conflicts=new Set(),messages=[],validDates=new Set(plannerAvailableDates(p.exam.start_date,p.exam.end_date,p.exam.include_saturdays,new Set(p.breaks.map(x=>x.break_date))));
+  p.schedules.forEach(x=>{
+    const key=x.class_id+'|'+x.exam_date;
+    if(!byClassDate.has(key))byClassDate.set(key,[]);
+    byClassDate.get(key).push(x);
+    if(x.exam_date<p.exam.start_date||x.exam_date>p.exam.end_date){conflicts.add(x.id);messages.push('An exam is outside the examination period.')}
+    else if(!validDates.has(x.exam_date)){conflicts.add(x.id);messages.push('An exam is scheduled on an excluded date: '+plannerDateLabel(x.exam_date)+'.')}
+  });
   byClassDate.forEach((items,key)=>{if(items.length>1){items.forEach(x=>conflicts.add(x.id));const [classId,date]=key.split('|');const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} has ${items.length} exams on ${plannerDateLabel(date)}.`)}});
-  return{conflicts,messages};
+  return{conflicts,messages:[...new Set(messages)]};
+}
+async function publishActiveExam(){
+  const p=window.activeExamPlanner;if(!p)return;
+  const validation=examCalendarValidation();
+  if(validation.messages.length)return toast('Resolve all planner conflicts before publishing.');
+  if(!p.schedules.length)return toast('There are no exam entries to publish.');
+  const result=await db.from('sc_exams').update({status:'Published'}).eq('id',p.exam.id).eq('school_id',APP.schoolId);
+  if(result.error)return toast(result.error.message);
+  p.exam.status='Published';
+  await logHistory('Published','Exam',p.exam.id,p.exam.exam_name+' exam plan published');
+  renderExamCalendar();toast('Exam plan published');
 }
 function renderExamCalendar(){
   const p=window.activeExamPlanner;if(!p)return;
@@ -458,20 +477,21 @@ function renderExamCalendar(){
   const first=start.getDay(),last=end.getDay();
   const gridStart=new Date(start);gridStart.setDate(start.getDate()-first);
   const gridEnd=new Date(end);gridEnd.setDate(end.getDate()+(6-last));
-  const days=[];for(let d=new Date(gridStart);d<=gridEnd;d.setDate(d.getDate()+1))days.push(plannerDateKey(d));
+  const days=[];for(let i=0;i<first;i++)days.push(null);for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1))days.push(plannerDateKey(d));
   const allDates=plannerAvailableDates(exam.start_date,exam.end_date,exam.include_saturdays,new Set(p.breaks.map(x=>x.break_date)));
   const availableSet=new Set(allDates);
-  v.innerHTML=`<div class="top"><div><h1>${plannerEscape(exam.exam_name)}</h1><p>${plannerDateLabel(exam.start_date)} – ${plannerDateLabel(exam.end_date)} · ${String(exam.paper_start_time).slice(0,5)} – ${String(exam.paper_end_time).slice(0,5)} · ${exam.status}</p></div><div class="actions"><button class="btn" onclick="go('planner')">← EXAM PLANS</button><button class="btn" onclick="openExamSettingsDb()">EDIT RULES</button><button class="btn primary" onclick="validateActiveExam()">VALIDATE</button></div></div>
+  v.innerHTML=`<div class="top"><div><h1>${plannerEscape(exam.exam_name)}</h1><p>${plannerDateLabel(exam.start_date)} – ${plannerDateLabel(exam.end_date)} · ${String(exam.paper_start_time).slice(0,5)} – ${String(exam.paper_end_time).slice(0,5)} · ${exam.status}</p></div><div class="actions"><button class="btn" onclick="go('planner')">← EXAM PLANS</button><button class="btn" onclick="openExamSettingsDb()">EDIT RULES</button><button class="btn" onclick="validateActiveExam()">VALIDATE</button><button class="btn primary" onclick="publishActiveExam()">PUBLISH PLAN</button></div></div>
   <div class="cards"><div class="card"><div class="label">Exam Entries</div><div class="metric">${p.schedules.length}</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">${new Set(p.schedules.map(x=>x.exam_date)).size}</div></div><div class="card"><div class="label">Study Leave</div><div class="metric">${p.breaks.length}</div></div><div class="card"><div class="label">Conflicts</div><div class="metric" id="plannerConflictMetric">${validation.conflicts.size}</div></div></div>
   ${validation.messages.length?`<div class="card error-note"><b>Conflicts detected</b><div style="margin-top:5px">${validation.messages.map(x=>plannerEscape(x)).join('<br>')}</div></div>`:''}
   <div class="card"><div class="cardhead"><h2>Calendar</h2><span class="note">Drag an exam to another available date.</span></div>
     <div class="tablewrap"><div class="planner-grid">
       ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div class="dayname" style="min-height:auto;padding:8px;border-right:1px solid #eef1f5;border-bottom:1px solid #eef1f5;font-size:9px;color:#7b869a;text-transform:uppercase;font-weight:800">${x}</div>`).join('')}
       ${days.map(date=>{
-        const inRange=date>=exam.start_date&&date<=exam.end_date,excluded=inRange&&!availableSet.has(date),items=schedulesByDate.get(date)||[],hasConflict=items.some(x=>validation.conflicts.has(x.id)),br=breakMap.get(date);
-        return `<div class="planner-day ${(!inRange||excluded)?'excluded ':''}${hasConflict?'conflict-day':''}" data-date="${date}" ondragover="allowPlannerDrop(event)" ondrop="dropPlannerExam(event,'${date}')">
-          <div class="planner-date"><b>${plannerLocalDate(date).getDate()} ${plannerLocalDate(date).toLocaleDateString(undefined,{month:'short'})}</b><span>${inRange?plannerDayName(date):''}</span></div>
-          ${!inRange?'':excluded&&!br?`<div class="planner-break">Excluded day</div>`:''}
+        if(!date)return '<div class="planner-day excluded"></div>';
+        const excluded=!availableSet.has(date),items=schedulesByDate.get(date)||[],hasConflict=items.some(x=>validation.conflicts.has(x.id)),br=breakMap.get(date);
+        return `<div class="planner-day ${excluded?'excluded ':''}${hasConflict?'conflict-day':''}" data-date="${date}" ondragover="allowPlannerDrop(event)" ondrop="dropPlannerExam(event,'${date}')">
+          <div class="planner-date"><b>${plannerLocalDate(date).getDate()} ${plannerLocalDate(date).toLocaleDateString(undefined,{month:'short'})}</b><span>${plannerDayName(date)}</span></div>
+          ${excluded&&!br?`<div class="planner-break">Excluded day</div>`:''}
           ${br?`<div class="planner-break"><b>${plannerEscape(br.description)}</b><br>Study leave / break</div>`:''}
           ${items.map(x=>{const sub=subjectMap.get(x.subject_id),cls=classMap.get(x.class_id);return `<div class="planner-chip ${validation.conflicts.has(x.id)?'conflict':''}" draggable="true" ondragstart="dragPlannerExam(event,'${x.id}')"><b>${plannerEscape(sub?.subject_name||'Subject')}</b><span>Class ${cls?.class_number||'—'}</span></div>`}).join('')}
         </div>`
