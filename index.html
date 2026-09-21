@@ -278,7 +278,7 @@ async function deleteAllSubjectsDb(){const check=await db.from('sc_subjects').se
 function plannerEscape(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-function plannerDateKey(d){return d.toISOString().slice(0,10)}
+function plannerDateKey(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function plannerLocalDate(value){const p=String(value).split('-').map(Number);return new Date(p[0],p[1]-1,p[2])}
 function plannerDateLabel(value){return plannerLocalDate(value).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}
 function plannerDayName(value){return plannerLocalDate(value).toLocaleDateString(undefined,{weekday:'short'})}
