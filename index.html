@@ -460,6 +460,40 @@ function examCalendarValidation(){
   schedulesByClass.forEach((items,classId)=>{const ordered=[...items].filter(x=>dateIndex.has(x.exam_date)).sort((a,b)=>dateIndex.get(a.exam_date)-dateIndex.get(b.exam_date));for(let i=1;i<ordered.length;i++){const gap=dateIndex.get(ordered[i].exam_date)-dateIndex.get(ordered[i-1].exam_date)-1;if(gap!==studyLeaveDays){conflicts.add(ordered[i-1].id);conflicts.add(ordered[i].id);const cls=p.classes.find(c=>c.id===classId);messages.push(`Class ${cls?.class_number||''} must have exactly ${studyLeaveDays} study-leave day${studyLeaveDays===1?'':'s'} between exams.`)}}});
   return{conflicts,messages:[...new Set(messages)]};
 }
+function exportPublishedDateSheet(){
+  const p=window.activeExamPlanner;
+  if(!p||p.exam.status!=='Published')return toast('Only a published exam plan can be exported.');
+  const school=APP.profile?.sc_schools||{};
+  const classMap=new Map(p.classes.map(x=>[x.id,x]));
+  const subjectMap=new Map(p.subjects.map(x=>[x.id,x]));
+  const dates=[...new Set(p.schedules.map(x=>x.exam_date))].sort();
+  const classes=[...p.classes].filter(cls=>p.schedules.some(x=>x.class_id===cls.id)).sort((a,b)=>Number(a.class_number)-Number(b.class_number));
+  if(!dates.length||!classes.length)return toast('There are no exam entries to export.');
+  const scheduleMap=new Map();
+  p.schedules.forEach(x=>{
+    const key=x.exam_date+'|'+x.class_id;
+    if(!scheduleMap.has(key))scheduleMap.set(key,[]);
+    scheduleMap.get(key).push(subjectMap.get(x.subject_id)?.subject_name||'');
+  });
+  const esc=v=>plannerEscape(v);
+  const logo=school.logo_url?'<img class="school-logo" src="'+esc(school.logo_url)+'" alt="School Logo">':'<div class="logo-placeholder">SC</div>';
+  const classHeaders=classes.map(cls=>'<th>Class '+esc(cls.class_number)+'</th>').join('');
+  const rows=dates.map(date=>{
+    const day=plannerLocalDate(date).toLocaleDateString(undefined,{weekday:'long'});
+    const cells=classes.map(cls=>{
+      const subjects=scheduleMap.get(date+'|'+cls.id)||[];
+      return '<td>'+ (subjects.length?subjects.map(esc).join('<br>'):'—') +'</td>';
+    }).join('');
+    return '<tr><td><b>'+esc(plannerDateLabel(date))+'</b></td><td>'+esc(day)+'</td>'+cells+'</tr>';
+  }).join('');
+  const sessionName=APP.session?.session_name||'';
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(p.exam.exam_name)+' - Date Sheet</title><style>'+
+  '@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;font-size:12px}.header{text-align:center;border-bottom:2px solid #172033;padding-bottom:12px;margin-bottom:14px}.brand{display:flex;align-items:center;justify-content:center;gap:12px}.school-logo{width:62px;height:62px;object-fit:contain}.logo-placeholder{width:62px;height:62px;border:2px solid #2457d6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#2457d6;font-size:18px}.school-name{font-size:22px;font-weight:800}.title{font-size:18px;font-weight:800;margin-top:8px;text-transform:uppercase}.exam-name{font-size:15px;font-weight:700;margin-top:5px}.meta{margin-top:6px;color:#4f5b70;font-size:11px}.date-table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:10px}.date-table th,.date-table td{border:1px solid #6d778b;padding:8px 6px;text-align:center;vertical-align:middle}.date-table th{background:#eef2f8;font-weight:800}.date-table th:nth-child(1){width:12%}.date-table th:nth-child(2){width:10%}.date-table td:first-child,.date-table td:nth-child(2){white-space:nowrap}.footer{margin-top:24px;display:flex;justify-content:space-between;font-size:11px;color:#4f5b70}.print-note{text-align:center;margin-top:12px;font-size:10px;color:#7b869a}@media print{.print-note{display:none}}'+
+  '</style></head><body><div class="header"><div class="brand">'+logo+'<div class="school-name">'+esc(school.name||'School')+'</div></div><div class="title">Date Sheet</div><div class="exam-name">'+esc(p.exam.exam_name)+'</div><div class="meta">'+esc(plannerDateLabel(p.exam.start_date))+' – '+esc(plannerDateLabel(p.exam.end_date))+' &nbsp; | &nbsp; '+esc(String(p.exam.paper_start_time).slice(0,5))+' – '+esc(String(p.exam.paper_end_time).slice(0,5))+(sessionName?' &nbsp; | &nbsp; Academic Session: '+esc(sessionName):'')+'</div></div><table class="date-table"><thead><tr><th>Date</th><th>Day</th>'+classHeaders+'</tr></thead><tbody>'+rows+'</tbody></table><div class="footer"><span>School Examination & Seating Management</span><span>Published Date Sheet</span></div><div class="print-note">Use the browser print dialog to print or choose “Save as PDF”.</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>';
+  const win=window.open('','_blank','width=1200,height=800');
+  if(!win)return toast('Please allow pop-ups to export the date sheet.');
+  win.document.open();win.document.write(html);win.document.close();
+}
 async function publishActiveExam(){
   const p=window.activeExamPlanner;if(!p)return;
   const validation=examCalendarValidation();
