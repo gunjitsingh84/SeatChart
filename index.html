@@ -189,7 +189,9 @@ async function saveRollAssignmentsDb(){
     const existingKeys=new Set(existing.map(x=>x.section_id+'|'+x.roll_number)),additions=desired.filter(x=>!existingKeys.has(x.section_id+'|'+x.roll_number));
     if(additions.length){const result=await db.from('sc_subject_rolls').insert(additions);if(result.error)throw result.error}
     await logHistory('Updated','Subject Rolls',s.subjectId,`Roll assignments updated for Class ${s.classNo} ${s.subjectName}`);
-    closeModal();toast('Roll assignments saved');
+    closeModal();
+    await loadSubjects();
+    toast('Roll assignments saved');
   }catch(e){console.error('saveRollAssignmentsDb failed',e);toast(e.message||'Unable to save roll assignments')}
 }
 async function deleteSubjectDb(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;const rollCheck=await db.from('sc_subject_rolls').select('id',{count:'exact',head:true}).eq('subject_id',id);if(rollCheck.error)return toast(rollCheck.error.message);if((rollCheck.count||0)>0)return toast('This subject has roll assignments and cannot be deleted. Remove the roll assignments first.');const result=await db.from('sc_subjects').delete().eq('id',id);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subject',id,name+' deleted');toast(name+' deleted');loadSubjects()}
