@@ -757,9 +757,74 @@ function toggleSeatingPair(key){
   if(window.seatingRuleState.allowedPairs.has(key))window.seatingRuleState.allowedPairs.delete(key);
   else window.seatingRuleState.allowedPairs.add(key);
 }
-function continueSeatingToRoomSelection(){
+async function continueSeatingToRoomSelection(){
   if(!window.seatingRuleState)return toast('Seating configuration is not available.');
-  toast('Seating rules saved for this plan. Room selection will be added in the next seating step.');
+  try{
+    const roomRes=await db.from('sc_rooms').select('id,room_number,room_name,capacity,layout_rows,layout_columns,floor,status').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).order('room_number');
+    if(roomRes.error)throw roomRes.error;
+    const rooms=roomRes.data||[];
+    window.seatingRuleState.rooms=rooms;
+    window.seatingRuleState.selectedRoomIds=new Set();
+    renderSeatingRoomSelection();
+  }catch(e){
+    console.error('continueSeatingToRoomSelection failed',e);
+    toast(e.message||'Unable to load rooms');
+  }
+}
+function seatingRoomCapacitySummary(){
+  const s=window.seatingRuleState;
+  if(!s)return{selectedRooms:[],benchCapacity:0,studentCapacity:0,requiredBenches:0,requiredStudents:0};
+  const selectedRooms=(s.rooms||[]).filter(r=>s.selectedRoomIds?.has(r.id));
+  const benchCapacity=selectedRooms.reduce((sum,r)=>sum+Number(r.capacity||0),0);
+  const requiredStudents=Number(s.totalCandidates||0);
+  const requiredBenches=s.studentsPerBench===2?Math.ceil(requiredStudents/2):requiredStudents;
+  return{selectedRooms,benchCapacity,studentCapacity:benchCapacity*Number(s.studentsPerBench||1),requiredBenches,requiredStudents};
+}
+function renderSeatingRoomSelection(){
+  const s=window.seatingRuleState;
+  if(!s)return;
+  const rooms=(s.rooms||[]);
+  const available=rooms.filter(r=>r.status==='Available'&&Number(r.capacity)>0&&Number(r.layout_rows)>0&&Number(r.layout_columns)>0);
+  const unavailable=rooms.filter(r=>!(r.status==='Available'&&Number(r.capacity)>0&&Number(r.layout_rows)>0&&Number(r.layout_columns)>0));
+  const summary=seatingRoomCapacitySummary();
+  const capacityOk=summary.benchCapacity>=summary.requiredBenches;
+  const roomCards=available.length?available.map(r=>{
+    const checked=s.selectedRoomIds.has(r.id);
+    const studentCapacity=Number(r.capacity||0)*Number(s.studentsPerBench||1);
+    return '<label class="card" style="display:block;cursor:pointer;border-color:'+(checked?'#2457d6':'#e4e8ef')+';background:'+(checked?'#f7f9ff':'#fff')+'">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px">'+
+      '<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleSeatingRoom(\''+r.id+'\')" style="margin-top:3px;width:auto">'+
+      '<div style="flex:1"><div style="display:flex;justify-content:space-between;gap:10px"><b>Room '+plannerEscape(r.room_number)+'</b><span class="badge">Available</span></div>'+
+      '<div class="note">'+plannerEscape(r.room_name||'Unnamed room')+(r.floor?' · '+plannerEscape(r.floor):'')+'</div>'+
+      '<div style="margin-top:10px;font-size:10px"><b>'+Number(r.capacity||0)+' benches</b> · '+Number(studentCapacity)+' student capacity · '+Number(r.layout_rows)+' × '+Number(r.layout_columns)+' layout</div></div></div></label>';
+  }).join(''):'<div class="planner-empty">No available rooms with a configured physical layout were found for this session.</div>';
+  const invalidNote=unavailable.length?'<div class="note" style="margin-top:12px">Rooms excluded from selection: '+unavailable.length+' unavailable or missing a valid physical layout.</div>':'';
+  openModal('<div class="modalhead"><h2>Select Rooms</h2><button class="x" onclick="closeModal()">×</button></div>'+
+    '<p>Select one or more available rooms for this exam date. Room capacity is measured in physical benches; the room layout must already be configured.</p>'+
+    '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Candidates</div><div class="metric">'+summary.requiredStudents+'</div><div class="note">Unique candidates for '+plannerDateLabel(s.examDate)+'</div></div>'+
+    '<div class="card"><div class="label">Required Benches</div><div class="metric">'+summary.requiredBenches+'</div><div class="note">'+(s.studentsPerBench===2?'Theoretical minimum at 2 students per bench':'1 student per bench')+'</div></div>'+
+    '<div class="card"><div class="label">Selected Benches</div><div class="metric" id="selectedBenchMetric">'+summary.benchCapacity+'</div><div class="note">Across selected rooms</div></div>'+
+    '<div class="card"><div class="label">Capacity Check</div><div class="metric" id="roomCapacityMetric" style="font-size:20px">'+(capacityOk?'READY':'INSUFFICIENT')+'</div><div class="note" id="roomCapacityNote">'+(capacityOk?'Selected rooms cover the required bench count.':('Need '+(summary.requiredBenches-summary.benchCapacity)+' more bench'+(summary.requiredBenches-summary.benchCapacity===1?'':'es')+'.'))+'</div></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Available Rooms</h3><span class="note">'+available.length+' configured room'+(available.length===1?'':'s')+'</span></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">'+roomCards+'</div>'+invalidNote+'</div>'+
+    '<div class="setup-note">Capacity validation uses the current students-per-bench setting. For 2 students per bench, this is the theoretical minimum; final seating generation will still enforce all class-pairing rules and may require additional benches.</div>'+
+    '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="continueSeatingToGeneration()">CONTINUE TO SEATING GENERATION</button></div>');
+}
+function toggleSeatingRoom(roomId){
+  const s=window.seatingRuleState;
+  if(!s)return;
+  if(s.selectedRoomIds.has(roomId))s.selectedRoomIds.delete(roomId);
+  else s.selectedRoomIds.add(roomId);
+  renderSeatingRoomSelection();
+}
+function continueSeatingToGeneration(){
+  const s=window.seatingRuleState;
+  if(!s)return toast('Seating configuration is not available.');
+  const summary=seatingRoomCapacitySummary();
+  if(!summary.selectedRooms.length)return toast('Select at least one room.');
+  if(summary.benchCapacity<summary.requiredBenches)return toast('Selected room capacity is insufficient. Select additional rooms.');
+  s.selectedRooms=summary.selectedRooms;
+  toast('Room selection and capacity validated. Seating generation is the next step.');
 }
 
 function examsHtml(exams=[],scheduleMap=new Map()){
