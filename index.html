@@ -736,7 +736,7 @@ async function openSeatingForExamDate(examId,examDate){
     const ruleBadge=(ok,label)=>'<span class="badge" style="'+(ok?'background:#eef8f2;color:#218653':'background:#fff1f0;color:#b53a32')+'">'+label+'</span>';
     const pairingHtml=pairingRows.length?pairingRows.map(p=>{
       const key=p.a+'|'+p.b;
-      return '<tr><td>Class '+p.an+'</td><td>Class '+p.bn+'</td><td>'+ (p.sameSubject?ruleBadge(false,'Same subject'):p.consecutive?ruleBadge(false,'Consecutive classes'):ruleBadge(true,'Allowed'))+'</td><td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" '+(p.allowed?'checked':'')+' '+(!p.allowed?'disabled':'')+' onchange="toggleSeatingPair(\\''+key+'\\')"> Allow pairing</label></td></tr>';
+      return '<tr><td>Class '+p.an+'</td><td>Class '+p.bn+'</td><td>'+ (p.sameSubject?ruleBadge(false,'Same subject'):p.consecutive?ruleBadge(false,'Consecutive classes'):ruleBadge(true,'Allowed'))+'</td><td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" '+(p.allowed?'checked':'')+' '+(!p.allowed?'disabled':'')+' onchange="toggleSeatingPair(\''+key+'\')"> Allow pairing</label></td></tr>';
     }).join(''):'<tr><td colspan="4" class="note">Only one exam class is scheduled for this date, so no class pairing is available.</td></tr>';
 
     openModal('<div class="modalhead"><h2>Generate Seating Plan</h2><button class="x" onclick="closeModal()">×</button></div>'+
