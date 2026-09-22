@@ -635,20 +635,78 @@ async function openExamFromExams(examId){
     const classIds=[...new Set(schedules.map(x=>x.class_id))];
     const subjectIds=[...new Set(schedules.map(x=>x.subject_id))];
     const dates=[...new Set(schedules.map(x=>x.exam_date))].sort();
-    const grouped=new Map();
-    schedules.forEach(x=>{
-      const key=x.exam_date+'|'+x.class_id;
-      if(!grouped.has(key))grouped.set(key,[]);
-      grouped.get(key).push(x);
+    const sortedClassIds=classIds.slice().sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0));
+    const dateButtons=dates.map(date=>{
+      const dateEntries=schedules.filter(x=>x.exam_date===date);
+      const dateClassIds=[...new Set(dateEntries.map(x=>x.class_id))].sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0));
+      return '<button class="btn primary" onclick="openSeatingForExamDate(\\''+exam.id+'\\',\\''+date+'\\')">GENERATE SEATING PLAN</button>';
     });
-    v.innerHTML='<div class="top"><div><h1>'+plannerEscape(exam.exam_name)+'</h1><p>'+plannerDateLabel(exam.start_date)+' – '+plannerDateLabel(exam.end_date)+' · '+String(exam.paper_start_time).slice(0,5)+' – '+String(exam.paper_end_time).slice(0,5)+'</p></div><div class="actions"><button class="btn" onclick="loadExams()">← EXAMS</button>'+(exam.status==='Published'?'<button class="btn primary" onclick="openExamCalendarDb(\''+exam.id+'\')">VIEW PLANNER</button>':'<button class="btn primary" onclick="openExamCalendarDb(\''+exam.id+'\')">OPEN PLAN</button>')+'</div></div>'+
+    v.innerHTML='<div class="top"><div><h1>'+plannerEscape(exam.exam_name)+'</h1><p>'+plannerDateLabel(exam.start_date)+' – '+plannerDateLabel(exam.end_date)+' · '+String(exam.paper_start_time).slice(0,5)+' – '+String(exam.paper_end_time).slice(0,5)+'</p></div><div class="actions"><button class="btn" onclick="loadExams()">← EXAMS</button><button class="btn primary" onclick="openExamCalendarDb(\\''+exam.id+'\\')">'+(exam.status==='Published'?'VIEW PLANNER':'OPEN PLAN')+'</button></div></div>'+
     '<div class="cards"><div class="card"><div class="label">Status</div><div style="margin-top:12px">'+examStatusBadge(exam.status)+'</div></div><div class="card"><div class="label">Classes</div><div class="metric">'+classIds.length+'</div><div class="note">Classes in exam plan</div></div><div class="card"><div class="label">Papers</div><div class="metric">'+schedules.length+'</div><div class="note">Class + subject entries</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">'+dates.length+'</div><div class="note">Scheduled paper dates</div></div></div>'+
-    '<div class="card"><div class="cardhead"><h2>Examination Schedule</h2><span class="note">'+subjectIds.length+' subjects scheduled</span></div><div class="tablewrap"><table class="table" style="min-width:'+Math.max(620,180+classIds.length*150)+'px"><thead><tr><th style="min-width:150px">Date & Day</th>'+classIds.slice().sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0)).map(classId=>'<th style="min-width:150px">Class '+plannerEscape(classMap.get(classId)?.class_number||'—')+'</th>').join('')+'</tr></thead><tbody>'+dates.map(date=>'<tr><td><b>'+plannerDateLabel(date)+'</b><br><span class="note">'+plannerDayName(date)+'</span></td>'+classIds.slice().sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0)).map(classId=>{const entries=schedules.filter(x=>x.exam_date===date&&x.class_id===classId);return '<td>'+ (entries.length?entries.map(x=>'<div style="font-weight:700">'+plannerEscape(subjectMap.get(x.subject_id)?.subject_name||'—')+'</div>').join('<div style="height:5px"></div>'):'<span class="note">—</span>')+'</td>'}).join('')+'</tr>').join('')+'</tbody></table></div></div>';
+    '<div class="card"><div class="cardhead"><h2>Examination Schedule</h2><span class="note">'+subjectIds.length+' subjects scheduled</span></div><div class="tablewrap"><table class="table" style="min-width:'+Math.max(760,180+classIds.length*150)+'px"><thead><tr><th style="min-width:150px">Date & Day</th>'+sortedClassIds.map(classId=>'<th style="min-width:150px">Class '+plannerEscape(classMap.get(classId)?.class_number||'—')+'</th>').join('')+'<th style="min-width:190px">Seating</th></tr></thead><tbody>'+dates.map(date=>'<tr><td><b>'+plannerDateLabel(date)+'</b><br><span class="note">'+plannerDayName(date)+'</span></td>'+sortedClassIds.map(classId=>{const entries=schedules.filter(x=>x.exam_date===date&&x.class_id===classId);return '<td>'+ (entries.length?entries.map(x=>'<div style="font-weight:700">'+plannerEscape(subjectMap.get(x.subject_id)?.subject_name||'—')+'</div>').join('<div style="height:5px"></div>'):'<span class="note">—</span>')+'</td>'}).join('')+'<td>'+dateButtons[dates.indexOf(date)]+'</td></tr>').join('')+'</tbody></table></div></div>';
   }catch(e){
     console.error('openExamFromExams failed',e);
     v.innerHTML='<div class="card error-note">'+plannerEscape(e.message||'Unable to open examination')+'</div>';
   }
 }
+
+async function openSeatingForExamDate(examId,examDate){
+  try{
+    const [scheduleRes,subjectRes,classRes,sectionRes,rollRes,examRes]=await Promise.all([
+      db.from('sc_exam_schedules').select('id,class_id,subject_id,exam_date').eq('exam_id',examId).eq('school_id',APP.schoolId).eq('exam_date',examDate),
+      db.from('sc_subjects').select('id,class_id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_classes').select('id,class_number').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_sections').select('id,class_id,section_name,student_count').eq('school_id',APP.schoolId),
+      db.from('sc_subject_rolls').select('subject_id,section_id,roll_number').eq('school_id',APP.schoolId),
+      db.from('sc_exams').select('id,exam_name,paper_start_time,paper_end_time').eq('id',examId).eq('school_id',APP.schoolId).single()
+    ]);
+    if(scheduleRes.error)throw scheduleRes.error;
+    if(subjectRes.error)throw subjectRes.error;
+    if(classRes.error)throw classRes.error;
+    if(sectionRes.error)throw sectionRes.error;
+    if(rollRes.error)throw rollRes.error;
+    if(examRes.error)throw examRes.error;
+
+    const schedules=scheduleRes.data||[],subjects=subjectRes.data||[],classes=classRes.data||[],sections=sectionRes.data||[],rolls=rollRes.data||[],exam=examRes.data;
+    if(!schedules.length){toast('No scheduled papers were found for this date.');return}
+    const classMap=new Map(classes.map(x=>[x.id,x]));
+    const subjectMap=new Map(subjects.map(x=>[x.id,x]));
+    const sectionsByClass=new Map();
+    sections.forEach(x=>{if(!sectionsByClass.has(x.class_id))sectionsByClass.set(x.class_id,[]);sectionsByClass.get(x.class_id).push(x)});
+    const rollSetBySubjectSection=new Map();
+    rolls.forEach(x=>rollSetBySubjectSection.set(x.subject_id+'|'+x.section_id,(rollSetBySubjectSection.get(x.subject_id+'|'+x.section_id)||new Set()).add(Number(x.roll_number))));
+    const rows=schedules.map(s=>{
+      const cls=classMap.get(s.class_id),subject=subjectMap.get(s.subject_id);
+      const candidateKeys=new Set();
+      (sectionsByClass.get(s.class_id)||[]).forEach(sec=>{
+        const set=rollSetBySubjectSection.get(s.subject_id+'|'+sec.id)||new Set();
+        set.forEach(roll=>candidateKeys.add(sec.id+'|'+roll));
+      });
+      return {classId:s.class_id,classNumber:Number(cls?.class_number||0),subjectId:s.subject_id,subjectName:subject?.subject_name||'—',candidates:candidateKeys.size};
+    }).sort((a,b)=>a.classNumber-b.classNumber||a.subjectName.localeCompare(b.subjectName));
+    const totalByClass=new Map();
+    rows.forEach(r=>totalByClass.set(r.classId,(totalByClass.get(r.classId)||0)+r.candidates));
+    const totalCandidates=[...new Set(rows.flatMap(r=>{
+      const ids=[];
+      (sectionsByClass.get(r.classId)||[]).forEach(sec=>{
+        const set=rollSetBySubjectSection.get(r.subjectId+'|'+sec.id)||new Set();
+        set.forEach(roll=>ids.push(r.classId+'|'+sec.id+'|'+roll));
+      });
+      return ids;
+    }))].length;
+    const classIds=[...new Set(rows.map(r=>r.classId))].sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0));
+    openModal('<div class="modalhead"><h2>Generate Seating Plan</h2><button class="x" onclick="closeModal()">×</button></div>'+
+      '<div class="note" style="margin-bottom:16px"><b>'+plannerEscape(exam.exam_name)+'</b> · '+plannerDateLabel(examDate)+' · '+String(exam.paper_start_time).slice(0,5)+' – '+String(exam.paper_end_time).slice(0,5)+'</div>'+
+      '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Exam Classes</div><div class="metric">'+classIds.length+'</div></div><div class="card"><div class="label">Exam Papers</div><div class="metric">'+rows.length+'</div></div><div class="card"><div class="label">Candidate Seats</div><div class="metric">'+totalCandidates+'</div><div class="note">Unique class/section/roll candidates</div></div></div>'+
+      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Candidates for this date</h3><span class="note">Taken directly from the exam schedule and subject roll assignments</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class</th><th>Subject</th><th>Candidates</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>Class '+r.classNumber+'</td><td><b>'+plannerEscape(r.subjectName)+'</b></td><td>'+r.candidates+'</td></tr>').join('')+'</tbody></table></div></div>'+
+      '<div class="card"><div class="cardhead"><h3 style="margin:0">Initial seating setting</h3></div><label class="field"><span>Students per bench</span><select id="seatingStudentsPerBench"><option value="1">1 student per bench</option><option value="2">2 students per bench</option></select></label><div class="note">Class pairing rules, room selection, physical room layout and seat generation will be configured in the next seating steps.</div></div>'+
+      '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CANCEL</button></div>');
+  }catch(e){
+    console.error('openSeatingForExamDate failed',e);
+    toast(e.message||'Unable to load seating candidates');
+  }
+}
+
 function examsHtml(exams=[],scheduleMap=new Map()){
   const total=exams.length,published=exams.filter(x=>x.status==='Published').length,upcoming=exams.filter(x=>x.status==='Published'&&x.start_date>=plannerTodayKey()).length,completed=exams.filter(x=>x.status==='Completed').length;
   return '<div class="top"><div><h1>Exams</h1><p>Manage examinations created through the Exam Planner.</p></div></div>'+
