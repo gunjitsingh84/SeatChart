@@ -684,7 +684,7 @@ async function exportPublishedSeatingPlan(examId,examDate){
   }catch(e){console.error('exportPublishedSeatingPlan failed',e);toast(e.message||'Unable to export seating plan');}
 }
 
-function openExamFromExams(examId){
+async function openExamFromExams(examId){
   const v=document.getElementById('view');
   v.innerHTML='<div class="card">Loading examination…</div>';
   try{
