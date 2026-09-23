@@ -628,21 +628,92 @@ function examStatusBadge(status){
   };
   return '<span class="badge" style="'+(styles[s]||styles.Draft)+'">'+plannerEscape(s)+'</span>';
 }
-async function openExamFromExams(examId){
+async function exportPublishedSeatingPlan(examId,examDate){
+  try{
+    const [planRes,assignRes,roomRes,classRes,sectionRes,examRes]=await Promise.all([
+      db.from('sc_seating_plans').select('id,status,exam_date,students_per_bench,published_at').eq('school_id',APP.schoolId).eq('exam_id',examId).eq('exam_date',examDate).eq('status','Published').maybeSingle(),
+      db.from('sc_seating_assignments').select('id,seating_plan_id,room_id,row_number,column_number,bench_number,seat_position,class_id,section_id,roll_number,subject_names').eq('school_id',APP.schoolId).order('room_id').order('row_number').order('column_number').order('seat_position'),
+      db.from('sc_rooms').select('id,room_number,room_name,floor,capacity,layout_rows,layout_columns').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_classes').select('id,class_number').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_sections').select('id,class_id,section_name').eq('school_id',APP.schoolId),
+      db.from('sc_exams').select('id,exam_name,paper_start_time,paper_end_time').eq('id',examId).eq('school_id',APP.schoolId).single()
+    ]);
+    if(planRes.error)throw planRes.error;
+    if(assignRes.error)throw assignRes.error;
+    if(roomRes.error)throw roomRes.error;
+    if(classRes.error)throw classRes.error;
+    if(sectionRes.error)throw sectionRes.error;
+    if(examRes.error)throw examRes.error;
+    const plan=planRes.data;
+    if(!plan)return toast('No published seating plan exists for this exam date.');
+    const assignments=(assignRes.data||[]).filter(x=>x.seating_plan_id===plan.id);
+    if(!assignments.length)return toast('The published seating plan has no seat assignments.');
+    const rooms=new Map((roomRes.data||[]).map(x=>[x.id,x]));
+    const classes=new Map((classRes.data||[]).map(x=>[x.id,x]));
+    const sections=new Map((sectionRes.data||[]).map(x=>[x.id,x]));
+    const school=APP.profile?.sc_schools||{};
+    const esc=v=>plannerEscape(v);
+    const logo=school.logo_url?'<img class="school-logo" src="'+esc(school.logo_url)+'" alt="School Logo">':'<div class="logo-placeholder">SC</div>';
+    const roomIds=[...new Set(assignments.map(x=>x.room_id))];
+    const roomPages=roomIds.map(roomId=>{
+      const room=rooms.get(roomId);
+      if(!room)throw new Error('A published assignment references a missing room.');
+      const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
+      if(!rows||!columns||rows*columns<capacity)throw new Error('Room '+String(room.room_number||'')+' has an invalid physical layout.');
+      const byPosition=new Map();
+      assignments.filter(x=>x.room_id===roomId).forEach(a=>{
+        const key=a.row_number+'|'+a.column_number;
+        if(!byPosition.has(key))byPosition.set(key,[]);
+        byPosition.get(key).push(a);
+      });
+      let grid='';
+      for(let row=1;row<=rows;row++){
+        grid+='<tr><th class="row-label">Row '+row+'</th>';
+        for(let col=1;col<=columns;col++){
+          const positionNumber=(row-1)*columns+col;
+          const seats=byPosition.get(row+'|'+col)||[];
+          if(positionNumber>capacity)grid+='<td class="unused">Unused position</td>';
+          else{
+            const benchNumber=seats[0]?.bench_number||positionNumber;
+            const students=seats.map(a=>{
+              const cls=classes.get(a.class_id),sec=sections.get(a.section_id);
+              return '<div class="student"><b>Class '+esc(cls?.class_number||'—')+' · '+esc(sec?.section_name||'—')+'</b><br>Roll '+esc(a.roll_number)+'<br><span>'+esc(a.subject_names||'—')+'</span></div>';
+            }).join('');
+            grid+='<td class="'+(students?'occupied':'empty')+'"><div class="bench"><div class="bench-no">Bench '+esc(benchNumber)+'</div>'+(students||'<span>Not allocated</span>')+'</div></td>';
+          }
+        }
+        grid+='</tr>';
+      }
+      const assigned=assignments.filter(x=>x.room_id===roomId);
+      const students=assigned.length,benches=new Set(assigned.map(x=>x.bench_number)).size;
+      return '<section class="room-page"><div class="room-header"><div class="brand">'+logo+'<div><div class="school-name">'+esc(school.name||'School')+'</div><div class="document-title">ROOM-WISE SEATING PLAN</div><div class="exam-name">'+esc(examRes.data.exam_name)+'</div><div class="meta">'+esc(plannerDateLabel(examDate))+' · '+esc(plannerDayName(examDate))+' · '+esc(String(examRes.data.paper_start_time).slice(0,5))+' – '+esc(String(examRes.data.paper_end_time).slice(0,5))+'</div></div></div><div class="room-meta"><b>Room '+esc(room.room_number)+'</b><br>'+esc(room.room_name||'Unnamed room')+(room.floor?' · '+esc(room.floor):'')+'<br>'+rows+' × '+columns+' layout · '+capacity+' benches<br>'+students+' students · '+benches+' benches used</div></div><table class="seat-table"><tbody>'+grid+'</tbody></table><div class="footer"><span>School Examination & Seating Management</span><span>Published seating plan</span></div></section>';
+    }).join('');
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(examRes.data.exam_name)+' - Seating '+esc(plannerDateLabel(examDate))+'</title><style>'+
+      '@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;font-size:10px}.room-page{page-break-after:always;min-height:180mm}.room-page:last-child{page-break-after:auto}.room-header{display:flex;justify-content:space-between;gap:18px;border-bottom:2px solid #172033;padding-bottom:8px;margin-bottom:9px}.brand{display:flex;align-items:center;gap:9px}.school-logo,.logo-placeholder{width:42px;height:42px;object-fit:contain}.logo-placeholder{border:2px solid #2457d6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#2457d6}.school-name{font-size:16px;font-weight:800}.document-title{font-size:12px;font-weight:800;margin-top:3px}.exam-name{font-size:11px;font-weight:700;margin-top:2px}.meta{font-size:9px;color:#596579;margin-top:2px}.room-meta{text-align:right;line-height:1.45;color:#596579}.room-meta b{font-size:14px;color:#172033}.seat-table{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}.seat-table td,.seat-table th{border:1px solid #cbd2dd}.seat-table .row-label{width:46px;background:#f2f4f8;text-align:center;font-size:8px;color:#596579}.seat-table td{height:60px;vertical-align:top}.seat-table .occupied{background:#f7f9ff}.seat-table .empty{background:#fbfcfe}.seat-table .unused{background:#f1f2f4;color:#969eaa;text-align:center;vertical-align:middle;font-size:8px}.bench{padding:4px}.bench-no{font-size:8px;font-weight:800;color:#53627a;margin-bottom:3px}.student{font-size:8px;line-height:1.25;border-top:1px solid #dfe4ec;padding:3px 0}.student:first-of-type{border-top:0}.student span{font-size:7px;color:#596579}.footer{display:flex;justify-content:space-between;margin-top:8px;font-size:8px;color:#68748a}@media print{.room-page{break-after:page}.room-page:last-child{break-after:auto}}'+
+      '</style></head><body>'+roomPages+'</body></html>';
+    const win=window.open('','_blank','width=1400,height=900');
+    if(!win)return toast('Please allow pop-ups to print the seating plan.');
+    win.document.open();win.document.write(html);win.document.close();setTimeout(()=>win.print(),400);
+  }catch(e){console.error('exportPublishedSeatingPlan failed',e);toast(e.message||'Unable to export seating plan');}
+}
+
+function openExamFromExams(examId){
   const v=document.getElementById('view');
   v.innerHTML='<div class="card">Loading examination…</div>';
   try{
-    const [examRes,scheduleRes,classRes,subjectRes]=await Promise.all([
+    const [examRes,scheduleRes,classRes,subjectRes,seatingPlanRes]=await Promise.all([
       db.from('sc_exams').select('*').eq('id',examId).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).single(),
       db.from('sc_exam_schedules').select('id,class_id,subject_id,exam_date').eq('exam_id',examId).eq('school_id',APP.schoolId),
       db.from('sc_classes').select('id,class_number').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
-      db.from('sc_subjects').select('id,class_id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId)
+      db.from('sc_subjects').select('id,class_id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_seating_plans').select('id,exam_date,status').eq('exam_id',examId).eq('school_id',APP.schoolId).eq('status','Published')
     ]);
     if(examRes.error)throw examRes.error;
     if(scheduleRes.error)throw scheduleRes.error;
     if(classRes.error)throw classRes.error;
     if(subjectRes.error)throw subjectRes.error;
-    const exam=examRes.data,schedules=scheduleRes.data||[],classes=classRes.data||[],subjects=subjectRes.data||[];
+    if(seatingPlanRes.error)throw seatingPlanRes.error;
+    const exam=examRes.data,schedules=scheduleRes.data||[],classes=classRes.data||[],subjects=subjectRes.data||[],publishedSeatingDates=new Set((seatingPlanRes.data||[]).map(x=>x.exam_date));
     const classMap=new Map(classes.map(x=>[x.id,x]));
     const subjectMap=new Map(subjects.map(x=>[x.id,x]));
     const classIds=[...new Set(schedules.map(x=>x.class_id))];
@@ -652,7 +723,7 @@ async function openExamFromExams(examId){
     const dateButtons=dates.map(date=>{
       const dateEntries=schedules.filter(x=>x.exam_date===date);
       const dateClassIds=[...new Set(dateEntries.map(x=>x.class_id))].sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0));
-      return '<button class="btn primary" onclick="openSeatingForExamDate(\''+exam.id+'\',\''+date+'\')">GENERATE SEATING PLAN</button>';
+      return '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="openSeatingForExamDate(\''+exam.id+'\',\''+date+'\')">GENERATE SEATING PLAN</button>'+(publishedSeatingDates.has(date)?'<button class="btn" onclick="exportPublishedSeatingPlan(\''+exam.id+'\',\''+date+'\')">PRINT SEATING</button>':'')+'</div>';
     });
     v.innerHTML='<div class="top"><div><h1>'+plannerEscape(exam.exam_name)+'</h1><p>'+plannerDateLabel(exam.start_date)+' – '+plannerDateLabel(exam.end_date)+' · '+String(exam.paper_start_time).slice(0,5)+' – '+String(exam.paper_end_time).slice(0,5)+'</p></div><div class="actions"><button class="btn" onclick="loadExams()">← EXAMS</button><button class="btn primary" onclick="openExamCalendarDb(\''+exam.id+'\')">'+(exam.status==='Published'?'VIEW PLANNER':'OPEN PLAN')+'</button></div></div>'+
     '<div class="cards"><div class="card"><div class="label">Status</div><div style="margin-top:12px">'+examStatusBadge(exam.status)+'</div></div><div class="card"><div class="label">Classes</div><div class="metric">'+classIds.length+'</div><div class="note">Classes in exam plan</div></div><div class="card"><div class="label">Papers</div><div class="metric">'+schedules.length+'</div><div class="note">Class + subject entries</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">'+dates.length+'</div><div class="note">Scheduled paper dates</div></div></div>'+
