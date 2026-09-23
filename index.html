@@ -799,12 +799,19 @@ async function continueSeatingToRoomSelection(){
 }
 function seatingRoomCapacitySummary(){
   const s=window.seatingRuleState;
-  if(!s)return{selectedRooms:[],benchCapacity:0,studentCapacity:0,requiredBenches:0,requiredStudents:0};
+  if(!s)return{selectedRooms:[],benchCapacity:0,studentCapacity:0,requiredBenches:0,theoreticalRequiredBenches:0,requiredStudents:0,pairedCount:0,singleCount:0};
   const selectedRooms=(s.rooms||[]).filter(r=>s.selectedRoomIds?.has(r.id));
   const benchCapacity=selectedRooms.reduce((sum,r)=>sum+Number(r.capacity||0),0);
   const requiredStudents=Number(s.totalCandidates||0);
-  const requiredBenches=s.studentsPerBench===2?Math.ceil(requiredStudents/2):requiredStudents;
-  return{selectedRooms,benchCapacity,studentCapacity:benchCapacity*Number(s.studentsPerBench||1),requiredBenches,requiredStudents};
+  const theoreticalRequiredBenches=s.studentsPerBench===2?Math.ceil(requiredStudents/2):requiredStudents;
+  let requiredBenches=theoreticalRequiredBenches,pairedCount=0,singleCount=requiredStudents;
+  if(s.studentsPerBench===2&&Array.isArray(s.candidates)){
+    const generated=buildSeatingBenches();
+    requiredBenches=generated.benches.length;
+    pairedCount=generated.pairedCount;
+    singleCount=generated.singleCount;
+  }
+  return{selectedRooms,benchCapacity,studentCapacity:benchCapacity*Number(s.studentsPerBench||1),requiredBenches,theoreticalRequiredBenches,requiredStudents,pairedCount,singleCount};
 }
 function renderSeatingRoomSelection(){
   const s=window.seatingRuleState;
@@ -828,12 +835,12 @@ function renderSeatingRoomSelection(){
   openModal('<div class="modalhead"><h2>Select Rooms</h2><button class="x" onclick="closeModal()">×</button></div>'+
     '<p>Select one or more available rooms for this exam date. Room capacity is measured in physical benches; the room layout must already be configured.</p>'+
     '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Candidates</div><div class="metric">'+summary.requiredStudents+'</div><div class="note">Unique candidates for '+plannerDateLabel(s.examDate)+'</div></div>'+
-    '<div class="card"><div class="label">Required Benches</div><div class="metric">'+summary.requiredBenches+'</div><div class="note">'+(s.studentsPerBench===2?'Theoretical minimum at 2 students per bench':'1 student per bench')+'</div></div>'+
+    '<div class="card"><div class="label">Required Benches</div><div class="metric">'+summary.requiredBenches+'</div><div class="note">'+(s.studentsPerBench===2?'Actual requirement after pairing rules · theoretical minimum '+summary.theoreticalRequiredBenches:'1 student per bench')+'</div></div>'+
     '<div class="card"><div class="label">Selected Benches</div><div class="metric" id="selectedBenchMetric">'+summary.benchCapacity+'</div><div class="note">Across selected rooms</div></div>'+
     '<div class="card"><div class="label">Capacity Check</div><div class="metric" id="roomCapacityMetric" style="font-size:20px">'+(capacityOk?'READY':'INSUFFICIENT')+'</div><div class="note" id="roomCapacityNote">'+(capacityOk?'Selected rooms cover the required bench count.':('Need '+(summary.requiredBenches-summary.benchCapacity)+' more bench'+(summary.requiredBenches-summary.benchCapacity===1?'':'es')+'.'))+'</div></div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Available Rooms</h3><span class="note">'+available.length+' configured room'+(available.length===1?'':'s')+'</span></div>'+
     '<div class="seating-room-grid">'+roomCards+'</div>'+invalidNote+'</div>'+
-    '<div class="setup-note">Capacity validation uses the current students-per-bench setting. For 2 students per bench, this is the theoretical minimum; final seating generation will still enforce all class-pairing rules and may require additional benches.</div>'+
+    '<div class="setup-note">Capacity validation now uses the actual bench requirement produced by the current pairing rules. For 2 students per bench, the theoretical minimum is '+summary.theoreticalRequiredBenches+' and the current pairing configuration requires '+summary.requiredBenches+' benches ('+summary.pairedCount+' paired, '+summary.singleCount+' single).</div>'+
     '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="continueSeatingToGeneration()">CONTINUE TO SEATING GENERATION</button></div>');
 }
 function toggleSeatingRoom(roomId){
