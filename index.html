@@ -1029,8 +1029,9 @@ function seatingPositionList(room){
   const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
   if(!Number.isInteger(rows)||rows<1||!Number.isInteger(columns)||columns<1||!Number.isInteger(capacity)||capacity<1||rows*columns<capacity)throw new Error('Room '+String(room.room_number||'')+' has an invalid physical layout or bench capacity.');
   const positions=[];
-  for(let row=1;row<=rows;row++){
-    for(let column=1;column<=columns;column++){
+  // Column-wise numbering: fill all rows in Column 1 first, then move to Column 2, and so on.
+  for(let column=1;column<=columns;column++){
+    for(let row=1;row<=rows;row++){
       if(positions.length>=capacity)break;
       positions.push({row,column});
     }
