@@ -754,10 +754,15 @@ async function openSeatingForExamDate(examId,examDate){
     seatingCandidates.forEach(x=>{x.subjectName=x.subjectNames.join(', ');});
     window.seatingRuleState={examId,examDate,studentsPerBench:1,totalCandidates,candidates:seatingCandidates,allowedPairs:new Set(pairingRows.filter(x=>x.allowed).map(x=>x.a+'|'+x.b))};
 
-    const ruleBadge=(ok,label)=>'<span class="badge" style="'+(ok?'background:#eef8f2;color:#218653':'background:#fff1f0;color:#b53a32')+'">'+label+'</span>';
+    const ruleBadge=(type,label)=>{
+      const warning=type==='warning';
+      return '<span class="badge" style="'+(warning?'background:#fff1f0;color:#b53a32':'background:#eef8f2;color:#218653')+'">'+label+'</span>';
+    };
     const pairingHtml=pairingRows.length?pairingRows.map(p=>{
       const key=p.a+'|'+p.b;
-      return '<tr><td>Class '+p.an+'</td><td>Class '+p.bn+'</td><td>'+ (p.sameSubject?ruleBadge(false,'Same subject'):p.consecutive?ruleBadge(false,'Consecutive classes'):ruleBadge(true,'Allowed'))+'</td><td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" '+(p.allowed?'checked':'')+' '+(!p.allowed?'disabled':'')+' onchange="toggleSeatingPair(\''+key+'\')"> Allow pairing</label></td></tr>';
+      const warning=p.sameSubject||p.consecutive;
+      const ruleLabel=p.sameSubject?'Warning: Same subject':p.consecutive?'Warning: Consecutive classes':'Allowed';
+      return '<tr><td>Class '+p.an+'</td><td>Class '+p.bn+'</td><td>'+ruleBadge(warning?'warning':'allowed',ruleLabel)+'</td><td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" '+(p.allowed?'checked':'')+' onchange="toggleSeatingPair(\''+key+'\')"> Allow pairing</label></td></tr>';
     }).join(''):'<tr><td colspan="4" class="note">Only one exam class is scheduled for this date, so no class pairing is available.</td></tr>';
 
     openModal('<div class="modalhead"><h2>Generate Seating Plan</h2><button class="x" onclick="closeModal()">×</button></div>'+
@@ -765,8 +770,8 @@ async function openSeatingForExamDate(examId,examDate){
       '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Exam Classes</div><div class="metric">'+classIds.length+'</div></div><div class="card"><div class="label">Exam Papers</div><div class="metric">'+rows.length+'</div></div><div class="card"><div class="label">Candidate Seats</div><div class="metric">'+totalCandidates+'</div><div class="note">Unique candidates across scheduled papers</div></div></div>'+
       '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Candidates for this date</h3><span class="note">Pulled directly from scheduled subjects and subject roll assignments</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class</th><th>Subject</th><th>Candidates</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>Class '+r.classNumber+'</td><td><b>'+plannerEscape(r.subjectName)+'</b></td><td>'+r.candidates+'</td></tr>').join('')+'</tbody></table></div></div>'+
       '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Seating Rules</h3><span class="note">Rules are calculated from this exam date</span></div>'+
-      '<div class="split"><label class="field"><span>Students per bench</span><select id="seatingStudentsPerBench" onchange="window.seatingRuleState.studentsPerBench=Number(this.value)"><option value="1">1 student per bench</option><option value="2">2 students per bench</option></select></label><div><div class="label">2-student bench restrictions</div><div class="note" style="margin-top:8px">Same-class pairing is never allowed. Classes with the same subject or consecutive class numbers cannot be paired.</div></div></div>'+
-      '<div style="margin-top:16px"><div class="label" style="margin-bottom:8px">Allowed class pairings</div><div class="tablewrap"><table class="table"><thead><tr><th>Class A</th><th>Class B</th><th>Rule Check</th><th>Use Pairing</th></tr></thead><tbody>'+pairingHtml+'</tbody></table></div></div></div>'+
+      '<div class="split"><label class="field"><span>Students per bench</span><select id="seatingStudentsPerBench" onchange="window.seatingRuleState.studentsPerBench=Number(this.value)"><option value="1">1 student per bench</option><option value="2">2 students per bench</option></select></label><div><div class="label">2-student bench rules</div><div class="note" style="margin-top:8px">Same-class pairing is never allowed. Same-subject and consecutive-class pairings are recommended to avoid, but can be overridden by selecting Allow pairing.</div></div></div>'+
+      '<div style="margin-top:16px"><div class="label" style="margin-bottom:8px">Class pairing options</div><div class="setup-note" style="margin:0 0 10px">Green means the pairing follows the thumb rules. Red means there is a warning, but you can still select the pairing and continue to room selection.</div><div class="tablewrap"><table class="table"><thead><tr><th>Class A</th><th>Class B</th><th>Rule Check</th><th>Use Pairing</th></tr></thead><tbody>'+pairingHtml+'</tbody></table></div></div></div>'+
       '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="continueSeatingToRoomSelection()">CONTINUE TO ROOM SELECTION</button></div>');
   }catch(e){
     console.error('openSeatingForExamDate failed',e);
@@ -857,10 +862,7 @@ function seatingPairAllowed(a,b){
   if(!s||!a||!b||a.classId===b.classId)return false;
   const keyA=a.classId+'|'+b.classId;
   const keyB=b.classId+'|'+a.classId;
-  if(!s.allowedPairs.has(keyA)&&!s.allowedPairs.has(keyB))return false;
-  const aSubjects=seatingCandidateSubjectSet(a),bSubjects=seatingCandidateSubjectSet(b);
-  for(const subject of aSubjects)if(bSubjects.has(subject))return false;
-  return Math.abs(Number(a.classNumber)-Number(b.classNumber))!==1;
+  return s.allowedPairs.has(keyA)||s.allowedPairs.has(keyB);
 }
 
 function buildSeatingBenches(){
