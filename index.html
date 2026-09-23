@@ -1350,7 +1350,52 @@ async function saveUserDb(){
   }
 }
 async function loadHistory(){const v=document.getElementById('view');v.innerHTML='<div class="card">Loading history…</div>';const {data,error}=await db.from('sc_history').select('*').eq('school_id',APP.schoolId).order('created_at',{ascending:false}).limit(50);if(error)return v.innerHTML=`<div class="card error-note">${error.message}</div>`;v.innerHTML=`<div class="top"><div><h1>History</h1><p>Recent academic setup actions for this school.</p></div></div><div class="card"><div class="timeline">${(data||[]).map(x=>`<div class="event"><time>${new Date(x.created_at).toLocaleString()}</time><b>${x.action} ${x.entity_type}</b><span>${x.description||''}</span></div>`).join('')||'<div class="event"><span>No history yet.</span></div>'}</div></div>`}
-function profileHtml(){return `<div class="top"><div><h1>Profile Management</h1><p>School and administrator profile.</p></div></div><div class="card"><div class="split"><div><div class="label">Administrator</div><div class="metric" style="font-size:20px">${APP.profile?.full_name||''}</div><div class="note">${APP.profile?.phone||''}</div></div><div><div class="label">School</div><div class="metric" style="font-size:20px">${APP.profile?.sc_schools?.name||''}</div><div class="note">${APP.profile?.sc_schools?.address||'No address set'}</div></div></div></div>`}
+function profileHtml(){
+  const school=APP.profile?.sc_schools||{};
+  return '<div class="top"><div><h1>Profile Management</h1><p>Manage your school information and administrator profile.</p></div><div class="actions"><button class="btn primary" onclick="schoolProfileModal()">EDIT SCHOOL INFORMATION</button></div></div>'+
+  '<div class="card"><div class="cardhead"><h2>School Information</h2><span class="note">Current school profile</span></div>'+
+  '<div class="split"><div><div class="label">School Name</div><div style="font-size:16px;font-weight:750;margin-top:7px">'+plannerEscape(school.name||'')+'</div></div><div><div class="label">School Phone</div><div style="font-size:16px;font-weight:750;margin-top:7px">'+plannerEscape(school.phone||'Not set')+'</div></div></div>'+
+  '<div style="margin-top:16px"><div class="label">School Address</div><div style="font-size:12px;margin-top:7px;color:#536075;white-space:pre-line">'+plannerEscape(school.address||'Not set')+'</div></div>'+
+  '<div style="margin-top:16px"><div class="label">School Logo</div><div style="margin-top:8px">'+(school.logo_url?'<img src="'+plannerEscape(school.logo_url)+'" alt="School logo" style="max-width:120px;max-height:70px;border:1px solid var(--line);border-radius:8px;padding:6px;object-fit:contain">':'<span class="note">No logo configured</span>')+'</div></div></div>'+
+  '<div class="card" style="margin-top:16px"><div class="cardhead"><h2>Administrator Profile</h2><span class="note">'+plannerEscape(APP.profile?.role||'')+'</span></div><div class="split"><div><div class="label">Full Name</div><div style="font-size:13px;font-weight:700;margin-top:7px">'+plannerEscape(APP.profile?.full_name||'')+'</div></div><div><div class="label">Phone</div><div style="font-size:13px;font-weight:700;margin-top:7px">'+plannerEscape(APP.profile?.phone||'')+'</div></div></div></div>';
+}
+function schoolProfileModal(){
+  const school=APP.profile?.sc_schools||{};
+  openModal('<div class="modalhead"><h2>Edit School Information</h2><button class="x" onclick="closeModal()">×</button></div>'+
+  '<p>Update the school information used throughout SeatChart.</p>'+
+  '<div class="field"><label>School Name *</label><input id="schoolProfileName" maxlength="150" value="'+plannerEscape(school.name||'')+'" placeholder="School name"></div>'+
+  '<div class="field"><label>School Address</label><textarea id="schoolProfileAddress" rows="3" maxlength="500" placeholder="School address">'+plannerEscape(school.address||'')+'</textarea></div>'+
+  '<div class="field"><label>School Phone</label><input id="schoolProfilePhone" maxlength="10" inputmode="numeric" value="'+plannerEscape(String(school.phone||'').replace(/\D/g,''))+'" placeholder="10 digit Indian mobile number"></div>'+
+  '<div class="field"><label>School Logo URL</label><input id="schoolProfileLogo" maxlength="500" value="'+plannerEscape(school.logo_url||'')+'" placeholder="https://..."></div>'+
+  '<div class="setup-note">Logo upload/storage will be added separately. For now, use a public image URL.</div>'+
+  '<div style="text-align:right"><button class="btn" onclick="closeModal()">CANCEL</button><button id="saveSchoolProfileBtn" class="btn primary" onclick="saveSchoolProfile()">SAVE CHANGES</button></div>');
+}
+async function saveSchoolProfile(){
+  const btn=document.getElementById('saveSchoolProfileBtn');
+  const name=String(document.getElementById('schoolProfileName')?.value||'').trim();
+  const address=String(document.getElementById('schoolProfileAddress')?.value||'').trim();
+  const phoneRaw=String(document.getElementById('schoolProfilePhone')?.value||'').trim();
+  const phone=phoneRaw?normalizePhone(phoneRaw):null;
+  const logoUrl=String(document.getElementById('schoolProfileLogo')?.value||'').trim()||null;
+  if(!name)return toast('School name is required.');
+  if(phone && !/^\+91\d{10}$/.test(phone))return toast('Enter a valid 10-digit Indian phone number.');
+  if(logoUrl && !/^https?:\/\//i.test(logoUrl))return toast('Logo URL must start with http:// or https://.');
+  if(btn){btn.disabled=true;btn.textContent='SAVING…';}
+  try{
+    const {data,error}=await db.from('sc_schools').update({name,address:address||null,phone,logo_url:logoUrl,updated_at:new Date().toISOString()}).eq('id',APP.schoolId).select('id,name,address,phone,logo_url,updated_at').single();
+    if(error)throw error;
+    APP.profile.sc_schools={...(APP.profile.sc_schools||{}),...data};
+    document.getElementById('sideSchool').textContent=data.name||'';
+    closeModal();
+    toast('School information updated successfully.');
+    go('profile');
+    await logHistory('Updated','School',data.id,'Updated school profile information');
+  }catch(e){
+    console.error('saveSchoolProfile failed',e);
+    toast(e.message||'Unable to update school information.');
+    if(btn){btn.disabled=false;btn.textContent='SAVE CHANGES';}
+  }
+}
 function filterRows(input,id){const q=input.value.toLowerCase();document.querySelectorAll(`#${id} tbody tr`).forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none')}
 function toast(msg){const t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.style.display='block';clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.style.display='none',2800)}
 function openModal(html){document.getElementById('modal').innerHTML=html;document.getElementById('modalbg').style.display='flex'}function closeModal(){document.getElementById('modalbg').style.display='none'}
