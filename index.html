@@ -701,17 +701,19 @@ function openExamFromExams(examId){
   const v=document.getElementById('view');
   v.innerHTML='<div class="card">Loading examination…</div>';
   try{
-    const [examRes,scheduleRes,classRes,subjectRes]=await Promise.all([
+    const [examRes,scheduleRes,classRes,subjectRes,seatingPlanRes]=await Promise.all([
       db.from('sc_exams').select('*').eq('id',examId).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).single(),
       db.from('sc_exam_schedules').select('id,class_id,subject_id,exam_date').eq('exam_id',examId).eq('school_id',APP.schoolId),
       db.from('sc_classes').select('id,class_number').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
-      db.from('sc_subjects').select('id,class_id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId)
+      db.from('sc_subjects').select('id,class_id,subject_name').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId),
+      db.from('sc_seating_plans').select('id,exam_date,status').eq('exam_id',examId).eq('school_id',APP.schoolId).eq('status','Published')
     ]);
     if(examRes.error)throw examRes.error;
     if(scheduleRes.error)throw scheduleRes.error;
     if(classRes.error)throw classRes.error;
     if(subjectRes.error)throw subjectRes.error;
-    const exam=examRes.data,schedules=scheduleRes.data||[],classes=classRes.data||[],subjects=subjectRes.data||[];
+    if(seatingPlanRes.error)throw seatingPlanRes.error;
+    const exam=examRes.data,schedules=scheduleRes.data||[],classes=classRes.data||[],subjects=subjectRes.data||[],publishedSeatingDates=new Set((seatingPlanRes.data||[]).map(x=>x.exam_date));
     const classMap=new Map(classes.map(x=>[x.id,x]));
     const subjectMap=new Map(subjects.map(x=>[x.id,x]));
     const classIds=[...new Set(schedules.map(x=>x.class_id))];
@@ -721,7 +723,7 @@ function openExamFromExams(examId){
     const dateButtons=dates.map(date=>{
       const dateEntries=schedules.filter(x=>x.exam_date===date);
       const dateClassIds=[...new Set(dateEntries.map(x=>x.class_id))].sort((a,b)=>Number(classMap.get(a)?.class_number||0)-Number(classMap.get(b)?.class_number||0));
-      return '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="openSeatingForExamDate(\''+exam.id+'\',\''+date+'\')">GENERATE SEATING PLAN</button><button class="btn" onclick="exportPublishedSeatingPlan(\''+exam.id+'\',\''+date+'\')">PRINT SEATING</button></div>';
+      return '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="openSeatingForExamDate(\''+exam.id+'\',\''+date+'\')">GENERATE SEATING PLAN</button>'+(publishedSeatingDates.has(date)?'<button class="btn" onclick="exportPublishedSeatingPlan(\''+exam.id+'\',\''+date+'\')">PRINT SEATING</button>':'')+'</div>';
     });
     v.innerHTML='<div class="top"><div><h1>'+plannerEscape(exam.exam_name)+'</h1><p>'+plannerDateLabel(exam.start_date)+' – '+plannerDateLabel(exam.end_date)+' · '+String(exam.paper_start_time).slice(0,5)+' – '+String(exam.paper_end_time).slice(0,5)+'</p></div><div class="actions"><button class="btn" onclick="loadExams()">← EXAMS</button><button class="btn primary" onclick="openExamCalendarDb(\''+exam.id+'\')">'+(exam.status==='Published'?'VIEW PLANNER':'OPEN PLAN')+'</button></div></div>'+
     '<div class="cards"><div class="card"><div class="label">Status</div><div style="margin-top:12px">'+examStatusBadge(exam.status)+'</div></div><div class="card"><div class="label">Classes</div><div class="metric">'+classIds.length+'</div><div class="note">Classes in exam plan</div></div><div class="card"><div class="label">Papers</div><div class="metric">'+schedules.length+'</div><div class="note">Class + subject entries</div></div><div class="card"><div class="label">Exam Days</div><div class="metric">'+dates.length+'</div><div class="note">Scheduled paper dates</div></div></div>'+
