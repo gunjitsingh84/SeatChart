@@ -1367,9 +1367,25 @@ function schoolProfileModal(){
   '<div class="field"><label>School Name *</label><input id="schoolProfileName" maxlength="150" value="'+plannerEscape(school.name||'')+'" placeholder="School name"></div>'+
   '<div class="field"><label>School Address</label><textarea id="schoolProfileAddress" rows="3" maxlength="500" placeholder="School address">'+plannerEscape(school.address||'')+'</textarea></div>'+
   '<div class="field"><label>School Phone</label><input id="schoolProfilePhone" maxlength="10" inputmode="numeric" value="'+plannerEscape(String(school.phone||'').replace(/\D/g,''))+'" placeholder="10 digit Indian mobile number"></div>'+
-  '<div class="field"><label>School Logo URL</label><input id="schoolProfileLogo" maxlength="500" value="'+plannerEscape(school.logo_url||'')+'" placeholder="https://..."></div>'+
-  '<div class="setup-note">Logo upload/storage will be added separately. For now, use a public image URL.</div>'+
+  '<div class="field"><label>School Logo</label><input id="schoolProfileLogoFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="previewSchoolLogo(this)">'+
+  '<div id="schoolLogoPreview" style="margin-top:8px">'+(school.logo_url?'<img src="'+plannerEscape(school.logo_url)+'" alt="Current school logo" style="max-width:140px;max-height:90px;border:1px solid var(--line);border-radius:8px;padding:6px;object-fit:contain">':'<span class="note">No logo uploaded</span>')+'</div>'+
+  '<div class="note" style="margin-top:6px">PNG, JPG or WEBP · Maximum 2 MB.</div></div>'+
   '<div style="text-align:right"><button class="btn" onclick="closeModal()">CANCEL</button><button id="saveSchoolProfileBtn" class="btn primary" onclick="saveSchoolProfile()">SAVE CHANGES</button></div>');
+}
+function previewSchoolLogo(input){
+  const file=input?.files?.[0],preview=document.getElementById('schoolLogoPreview');
+  if(!file||!preview)return;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){preview.innerHTML='<span class="note" style="color:var(--bad)">Only PNG, JPG or WEBP files are allowed.</span>';input.value='';return}
+  if(file.size>2*1024*1024){preview.innerHTML='<span class="note" style="color:var(--bad)">Logo must be 2 MB or smaller.</span>';input.value='';return}
+  const reader=new FileReader();
+  reader.onload=()=>{preview.innerHTML='<img src="'+reader.result+'" alt="Selected school logo" style="max-width:140px;max-height:90px;border:1px solid var(--line);border-radius:8px;padding:6px;object-fit:contain">';};
+  reader.readAsDataURL(file);
+}
+function schoolLogoStoragePathFromUrl(url){
+  const marker='/storage/v1/object/public/school-logos/';
+  const value=String(url||'');
+  const index=value.indexOf(marker);
+  return index===-1?null:value.slice(index+marker.length).split('?')[0];
 }
 async function saveSchoolProfile(){
   const btn=document.getElementById('saveSchoolProfileBtn');
@@ -1377,22 +1393,42 @@ async function saveSchoolProfile(){
   const address=String(document.getElementById('schoolProfileAddress')?.value||'').trim();
   const phoneRaw=String(document.getElementById('schoolProfilePhone')?.value||'').trim();
   const phone=phoneRaw?normalizePhone(phoneRaw):null;
-  const logoUrl=String(document.getElementById('schoolProfileLogo')?.value||'').trim()||null;
+  const file=document.getElementById('schoolProfileLogoFile')?.files?.[0]||null;
+  const previousLogoUrl=String(APP.profile?.sc_schools?.logo_url||'').trim()||null;
   if(!name)return toast('School name is required.');
-  if(phone && !/^\+91\d{10}$/.test(phone))return toast('Enter a valid 10-digit Indian phone number.');
-  if(logoUrl && !/^https?:\/\//i.test(logoUrl))return toast('Logo URL must start with http:// or https://.');
-  if(btn){btn.disabled=true;btn.textContent='SAVING…';}
+  if(phone && !/^\+91\d{10}$/.test(phone))return toast('Enter a valid 10-digit Indian mobile number.');
+  if(file){
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type))return toast('Logo must be PNG, JPG or WEBP.');
+    if(file.size>2*1024*1024)return toast('Logo must be 2 MB or smaller.');
+  }
+  if(btn){btn.disabled=true;btn.textContent=file?'UPLOADING…':'SAVING…';}
+  let uploadedPath=null;
   try{
+    let logoUrl=previousLogoUrl;
+    if(file){
+      const extension=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+      uploadedPath=APP.schoolId+'/logo-'+Date.now()+'.'+extension;
+      const upload=await db.storage.from('school-logos').upload(uploadedPath,file,{cacheControl:'3600',contentType:file.type,upsert:false});
+      if(upload.error)throw upload.error;
+      const publicResult=db.storage.from('school-logos').getPublicUrl(uploadedPath);
+      logoUrl=publicResult?.data?.publicUrl||null;
+      if(!logoUrl)throw new Error('Unable to create the school logo URL.');
+    }
     const {data,error}=await db.from('sc_schools').update({name,address:address||null,phone,logo_url:logoUrl,updated_at:new Date().toISOString()}).eq('id',APP.schoolId).select('id,name,address,phone,logo_url,updated_at').single();
     if(error)throw error;
+    if(file&&previousLogoUrl){
+      const previousPath=schoolLogoStoragePathFromUrl(previousLogoUrl);
+      if(previousPath&&previousPath.startsWith(APP.schoolId+'/'))await db.storage.from('school-logos').remove([previousPath]);
+    }
     APP.profile.sc_schools={...(APP.profile.sc_schools||{}),...data};
     document.getElementById('sideSchool').textContent=data.name||'';
     closeModal();
     toast('School information updated successfully.');
     go('profile');
-    await logHistory('Updated','School',data.id,'Updated school profile information');
+    await logHistory('Updated','School',data.id,file?'Updated school profile information and logo':'Updated school profile information');
   }catch(e){
     console.error('saveSchoolProfile failed',e);
+    if(uploadedPath)await db.storage.from('school-logos').remove([uploadedPath]);
     toast(e.message||'Unable to update school information.');
     if(btn){btn.disabled=false;btn.textContent='SAVE CHANGES';}
   }
