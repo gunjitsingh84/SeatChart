@@ -731,7 +731,28 @@ async function openSeatingForExamDate(examId,examDate){
       }
     }
 
-    window.seatingRuleState={examId,examDate,studentsPerBench:1,totalCandidates,allowedPairs:new Set(pairingRows.filter(x=>x.allowed).map(x=>x.a+'|'+x.b))};
+    const seatingCandidates=[];
+    const candidateSeen=new Map();
+    schedules.forEach(sch=>{
+      const cls=classMap.get(sch.class_id);
+      const subject=subjectMap.get(sch.subject_id);
+      (sectionsByClass.get(sch.class_id)||[]).forEach(sec=>{
+        const set=rollSetBySubjectSection.get(sch.subject_id+'|'+sec.id)||new Set();
+        set.forEach(roll=>{
+          const key=sec.id+'|'+Number(roll);
+          let candidate=candidateSeen.get(key);
+          if(!candidate){
+            candidate={key,sectionId:sec.id,sectionName:sec.section_name,classId:sch.class_id,classNumber:Number(cls?.class_number||0),rollNumber:Number(roll),subjectNames:[]};
+            candidateSeen.set(key,candidate);
+            seatingCandidates.push(candidate);
+          }
+          const subjectName=String(subject?.subject_name||'—').trim();
+          if(subjectName&&!candidate.subjectNames.includes(subjectName))candidate.subjectNames.push(subjectName);
+        });
+      });
+    });
+    seatingCandidates.forEach(x=>{x.subjectName=x.subjectNames.join(', ');});
+    window.seatingRuleState={examId,examDate,studentsPerBench:1,totalCandidates,candidates:seatingCandidates,allowedPairs:new Set(pairingRows.filter(x=>x.allowed).map(x=>x.a+'|'+x.b))};
 
     const ruleBadge=(ok,label)=>'<span class="badge" style="'+(ok?'background:#eef8f2;color:#218653':'background:#fff1f0;color:#b53a32')+'">'+label+'</span>';
     const pairingHtml=pairingRows.length?pairingRows.map(p=>{
@@ -824,7 +845,144 @@ function continueSeatingToGeneration(){
   if(!summary.selectedRooms.length)return toast('Select at least one room.');
   if(summary.benchCapacity<summary.requiredBenches)return toast('Selected room capacity is insufficient. Select additional rooms.');
   s.selectedRooms=summary.selectedRooms;
-  toast('Room selection and capacity validated. Seating generation is the next step.');
+  renderSeatingGeneration();
+}
+
+function seatingCandidateSubjectSet(candidate){
+  return new Set((candidate.subjectNames||[]).map(x=>String(x).trim().toLowerCase()).filter(Boolean));
+}
+
+function seatingPairAllowed(a,b){
+  const s=window.seatingRuleState;
+  if(!s||!a||!b||a.classId===b.classId)return false;
+  const keyA=a.classId+'|'+b.classId;
+  const keyB=b.classId+'|'+a.classId;
+  if(!s.allowedPairs.has(keyA)&&!s.allowedPairs.has(keyB))return false;
+  const aSubjects=seatingCandidateSubjectSet(a),bSubjects=seatingCandidateSubjectSet(b);
+  for(const subject of aSubjects)if(bSubjects.has(subject))return false;
+  return Math.abs(Number(a.classNumber)-Number(b.classNumber))!==1;
+}
+
+function buildSeatingBenches(){
+  const s=window.seatingRuleState;
+  if(!s)return{benches:[],pairedCount:0,singleCount:0};
+  const candidates=[...(s.candidates||[])].sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))||String(a.sectionName).localeCompare(String(b.sectionName))||Number(a.rollNumber)-Number(b.rollNumber));
+  const benches=[];
+  const pairedKeys=new Set();
+  const candidateByKey=new Map(candidates.map(x=>[x.key,x]));
+  let pairedCount=0;
+  if(Number(s.studentsPerBench)===1){
+    candidates.forEach(candidate=>benches.push({students:[candidate],pairType:'single'}));
+    return{benches,pairedCount:0,singleCount:benches.length};
+  }
+
+  const remaining=new Map(candidates.map(x=>[x.key,x]));
+  while(remaining.size){
+    const first=[...remaining.values()][0];
+    let partner=null;
+    const possible=[...remaining.values()].filter(x=>x.key!==first.key&&seatingPairAllowed(first,x));
+    if(possible.length){
+      possible.sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))||String(a.sectionName).localeCompare(String(b.sectionName))||Number(a.rollNumber)-Number(b.rollNumber));
+      partner=possible[0];
+    }
+    if(partner){
+      benches.push({students:[first,partner],pairType:'paired'});
+      remaining.delete(first.key);
+      remaining.delete(partner.key);
+      pairedKeys.add(first.key);
+      pairedKeys.add(partner.key);
+      pairedCount++;
+    }else{
+      benches.push({students:[first],pairType:'single'});
+      remaining.delete(first.key);
+    }
+  }
+  const singleCount=benches.filter(x=>x.students.length===1).length;
+  if(candidateByKey.size!==candidates.length)throw new Error('Duplicate candidate records were detected.');
+  return{benches,pairedCount,singleCount};
+}
+
+function seatingPositionList(room){
+  const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
+  if(!Number.isInteger(rows)||rows<1||!Number.isInteger(columns)||columns<1||!Number.isInteger(capacity)||capacity<1||rows*columns<capacity)throw new Error('Room '+String(room.room_number||'')+' has an invalid physical layout or bench capacity.');
+  const positions=[];
+  for(let row=1;row<=rows;row++){
+    for(let column=1;column<=columns;column++){
+      if(positions.length>=capacity)break;
+      positions.push({row,column});
+    }
+  }
+  return positions;
+}
+
+function generateSeatingPlan(){
+  const s=window.seatingRuleState;
+  if(!s)return null;
+  const result=buildSeatingBenches();
+  const positions=[];
+  s.selectedRooms.forEach(room=>{
+    seatingPositionList(room).forEach(position=>positions.push({room,row:position.row,column:position.column}));
+  });
+  if(positions.length<result.benches.length){
+    throw new Error('Selected rooms provide '+positions.length+' physical bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
+  }
+  const assignments=result.benches.map((bench,index)=>{
+    const slot=positions[index];
+    return{
+      benchNumber:index+1,
+      roomId:slot.room.id,
+      roomNumber:slot.room.room_number,
+      roomName:slot.room.room_name||'',
+      floor:slot.room.floor||'',
+      row:slot.row,
+      column:slot.column,
+      students:bench.students
+    };
+  });
+  const assignedKeys=assignments.flatMap(x=>x.students.map(y=>y.key));
+  const uniqueAssigned=new Set(assignedKeys);
+  if(uniqueAssigned.size!==assignedKeys.length)throw new Error('Seating generation created duplicate candidate assignments.');
+  if(uniqueAssigned.size!==s.candidates.length)throw new Error('Seating generation did not assign every candidate.');
+  assignments.forEach(x=>{
+    if(x.students.length===2&&!seatingPairAllowed(x.students[0],x.students[1]))throw new Error('A generated two-student bench violates the configured pairing rules.');
+  });
+  return{...result,assignments,unusedPositions:positions.length-assignments.length};
+}
+
+function seatingGenerationSummary(plan){
+  const roomMap=new Map();
+  plan.assignments.forEach(x=>{
+    if(!roomMap.has(x.roomId))roomMap.set(x.roomId,{roomNumber:x.roomNumber,benches:0,students:0});
+    const item=roomMap.get(x.roomId);
+    item.benches++;
+    item.students+=x.students.length;
+  });
+  return{rooms:roomMap.size,benches:plan.assignments.length,students:plan.assignments.reduce((n,x)=>n+x.students.length,0),paired:plan.pairedCount,singles:plan.singleCount,unused:plan.unusedPositions,roomMap};
+}
+
+function renderSeatingGeneration(){
+  const s=window.seatingRuleState;
+  if(!s)return;
+  try{
+    const plan=generateSeatingPlan();
+    s.generatedPlan=plan;
+    const summary=seatingGenerationSummary(plan);
+    const roomRows=[...summary.roomMap.values()].map(x=>'<tr><td>Room '+plannerEscape(x.roomNumber)+'</td><td>'+x.benches+'</td><td>'+x.students+'</td></tr>').join('');
+    const sample=plan.assignments.slice(0,40).map(x=>{
+      const students=x.students.map(y=>'Class '+y.classNumber+' · '+plannerEscape(y.subjectName)+' · '+plannerEscape(y.sectionName)+' · Roll '+y.rollNumber).join(' <b>+</b> ');
+      return '<tr><td>Room '+plannerEscape(x.roomNumber)+'</td><td>'+x.row+'</td><td>'+x.column+'</td><td>'+students+'</td></tr>';
+    }).join('');
+    openModal('<div class="modalhead"><h2>Seating Generation</h2><button class="x" onclick="closeModal()">×</button></div>'+
+      '<p>Generated seating for '+plannerDateLabel(s.examDate)+'. The plan uses the selected rooms in physical row/column order and enforces all configured pairing rules.</p>'+
+      '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Candidates</div><div class="metric">'+s.candidates.length+'</div></div><div class="card"><div class="label">Benches Used</div><div class="metric">'+summary.benches+'</div><div class="note">'+summary.paired+' paired · '+summary.singles+' single</div></div><div class="card"><div class="label">Rooms Used</div><div class="metric">'+summary.rooms+'</div></div><div class="card"><div class="label">Unused Positions</div><div class="metric">'+summary.unused+'</div><div class="note">Within configured room layouts</div></div></div>'+
+      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Room Allocation</h3><span class="badge">VALIDATED</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Room</th><th>Benches Used</th><th>Students</th></tr></thead><tbody>'+roomRows+'</tbody></table></div></div>'+
+      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Generated Seats</h3><span class="note">Showing first '+Math.min(40,plan.assignments.length)+' bench assignments</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Room</th><th>Row</th><th>Column</th><th>Students</th></tr></thead><tbody>'+sample+'</tbody></table></div></div>'+
+      '<div class="setup-note">All candidates are assigned exactly once. Two-student benches use only explicitly allowed class pairings and also enforce different subjects and non-consecutive classes. Publishing is not part of S5.</div>'+
+      '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button><button class="btn primary" onclick="toast(\'S5 seating plan generated successfully.\')">GENERATED PLAN READY</button></div>');
+  }catch(e){
+    console.error('renderSeatingGeneration failed',e);
+    toast(e.message||'Unable to generate seating plan');
+  }
 }
 
 function examsHtml(exams=[],scheduleMap=new Map()){
