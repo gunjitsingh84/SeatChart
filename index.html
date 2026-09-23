@@ -628,7 +628,7 @@ function examStatusBadge(status){
   };
   return '<span class="badge" style="'+(styles[s]||styles.Draft)+'">'+plannerEscape(s)+'</span>';
 }
-async async function exportPublishedSeatingPlan(examId,examDate){
+async function exportPublishedSeatingPlan(examId,examDate){
   try{
     const [planRes,assignRes,roomRes,classRes,sectionRes,examRes]=await Promise.all([
       db.from('sc_seating_plans').select('id,status,exam_date,students_per_bench,published_at').eq('school_id',APP.schoolId).eq('exam_id',examId).eq('exam_date',examDate).eq('status','Published').maybeSingle(),
