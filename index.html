@@ -1149,16 +1149,18 @@ async function saveAndPublishSeatingPlan(){
 
 function seatingClassLabel(classNumber){
   const n=Number(classNumber);
-  if(n===10)return 'X';
-  if(n===11)return 'XI';
-  if(n===12)return 'XII';
-  return String(n);
+  const labels={1:'I',2:'II',3:'III',4:'IV',5:'V',6:'VI',7:'VII',8:'VIII',9:'IX',10:'X',11:'XI',12:'XII'};
+  return labels[n]||String(n);
+}
+function seatingClassSectionLabel(classNumber,sectionName){
+  const cls=seatingClassLabel(classNumber),section=String(sectionName||'').trim();
+  return section?cls+'-'+section:cls;
 }
 function consolidateSeatingSubjects(assignments){
   const map=new Map();
   assignments.forEach(a=>a.students.forEach(student=>{
-    const key=student.classId+'|'+student.subjectName;
-    if(!map.has(key))map.set(key,{classNumber:student.classNumber,subjectName:student.subjectName,rolls:[]});
+    const key=student.classId+'|'+student.sectionId+'|'+student.subjectName;
+    if(!map.has(key))map.set(key,{classNumber:student.classNumber,sectionName:student.sectionName,subjectName:student.subjectName,rolls:[]});
     map.get(key).rolls.push(Number(student.rollNumber));
   }));
   const rangeText=rolls=>{
@@ -1172,8 +1174,13 @@ function consolidateSeatingSubjects(assignments){
     ranges.push(start===prev?String(start):start+'-'+prev);
     return ranges.join(', ');
   };
-  return [...map.values()].sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))).map(x=>({
+  return [...map.values()].sort((a,b)=>
+    Number(a.classNumber)-Number(b.classNumber)||
+    String(a.sectionName).localeCompare(String(b.sectionName))||
+    String(a.subjectName).localeCompare(String(b.subjectName))
+  ).map(x=>({
     classNumber:x.classNumber,
+    sectionName:x.sectionName,
     subjectName:x.subjectName,
     rollText:rangeText(x.rolls)
   }));
@@ -1188,7 +1195,10 @@ function renderPhysicalSeatingChart(){
     const usedRooms=[...rooms.values()].filter(x=>x.assignments.length);
     const roomSections=usedRooms.map(item=>{
       const room=item.room,rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
-      const assignmentMap=new Map(item.assignments.map(a=>[a.row+'|'+a.column,a]));
+      const roomAssignments=[...item.assignments].sort((a,b)=>a.row-b.row||a.column-b.column);
+      const displayBenchByPosition=new Map();
+      roomAssignments.forEach((a,index)=>displayBenchByPosition.set(a.row+'|'+a.column,index+1));
+      const assignmentMap=new Map(roomAssignments.map(a=>[a.row+'|'+a.column,a]));
       let grid='';
       for(let row=1;row<=rows;row++){
         grid+='<tr><th>Row '+row+'</th>';
@@ -1196,19 +1206,26 @@ function renderPhysicalSeatingChart(){
           const positionNumber=(row-1)*columns+col,a=assignmentMap.get(row+'|'+col);
           if(positionNumber>capacity)grid+='<td class="seat-unused">—</td>';
           else if(a){
-            const rollText=a.students.map(y=>y.rollNumber+' ('+seatingClassLabel(y.classNumber)+')').join(' , ');
-            grid+='<td class="seat-occupied"><b>'+a.benchNumber+'</b><div class="seat-roll">'+plannerEscape(rollText)+'</div></td>';
-          }else grid+='<td class="seat-empty"><b>'+positionNumber+'</b><div>—</div></td>';
+            const benchNumber=displayBenchByPosition.get(row+'|'+col)||1;
+            const rollText=a.students.map(y=>y.rollNumber+' ('+seatingClassSectionLabel(y.classNumber,y.sectionName)+')').join(' , ');
+            grid+='<td class="seat-occupied"><b>'+benchNumber+'</b><div class="seat-roll">'+plannerEscape(rollText)+'</div></td>';
+          }else{
+            const nextBench=roomAssignments.length<capacity?positionNumber:'';
+            grid+='<td class="seat-empty"><b>'+nextBench+'</b><div>—</div></td>';
+          }
         }
         grid+='</tr>';
       }
-      return '<div class="card physical-room-chart"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' · '+capacity+' benches</div></div><span class="badge">'+item.assignments.length+' benches used</span></div><div class="tablewrap"><table class="seat-layout-table"><tbody>'+grid+'</tbody></table></div></div>';
+      const roomSummary=consolidateSeatingSubjects(roomAssignments).map(x=>
+        '<tr><td>'+plannerEscape(seatingClassSectionLabel(x.classNumber,x.sectionName))+'</td><td>'+plannerEscape(x.subjectName)+'</td><td>'+plannerEscape(x.rollText)+'</td></tr>'
+      ).join('');
+      return '<div class="card physical-room-chart"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' · '+capacity+' benches</div></div><span class="badge">'+roomAssignments.length+' benches used</span></div>'+
+        '<div class="card" style="margin:0 0 12px"><div class="cardhead"><h4 style="margin:0">Room Candidate List</h4><span class="note">Class / Section · Subject · Roll Numbers</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class / Section</th><th>Subject</th><th>Roll Numbers</th></tr></thead><tbody>'+roomSummary+'</tbody></table></div></div>'+
+        '<div class="tablewrap"><table class="seat-layout-table"><tbody>'+grid+'</tbody></table></div></div>';
     }).join('');
-    const consolidated=consolidateSeatingSubjects(plan.assignments).map(x=>'<tr><td>Class '+plannerEscape(x.classNumber)+'</td><td>'+plannerEscape(x.subjectName)+'</td><td>'+plannerEscape(x.rollText)+'</td></tr>').join('');
     openModal('<div class="modalhead"><h2>Physical Seating Chart</h2><button class="x" onclick="closeModal()">×</button></div>'+
       '<p>'+plannerDateLabel(s.examDate)+' · '+s.candidates.length+' candidates · '+usedRooms.length+' rooms used.</p>'+
-      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Consolidated Candidate List</h3><span class="note">Class + subject + roll ranges</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class</th><th>Subject</th><th>Roll Numbers</th></tr></thead><tbody>'+consolidated+'</tbody></table></div></div>'+
-      '<div class="setup-note" style="margin-bottom:16px"><b>Seat format:</b> Bench number is shown first. Roll numbers are followed by the class in brackets — e.g. <b>1 (3)</b> or <b>22 (X)</b>.</div>'+
+      '<div class="setup-note" style="margin-bottom:16px"><b>Seat format:</b> Each room starts its bench numbering from <b>1</b>. Each student is shown as <b>Roll (Class-Section)</b>, for example <b>14 (X-A)</b> or <b>22 (III-B)</b>.</div>'+
       roomSections+
       '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button></div>');
   }catch(e){console.error('renderPhysicalSeatingChart failed',e);toast(e.message||'Unable to render physical seating chart');}
