@@ -1043,37 +1043,32 @@ function generateSeatingPlan(){
   const s=window.seatingRuleState;
   if(!s)return null;
   const result=buildSeatingBenches();
+  const selectedRooms=[...(s.selectedRooms||[])];
   const positions=[];
-  s.selectedRooms.forEach(room=>{
-    seatingPositionList(room).forEach(position=>positions.push({room,row:position.row,column:position.column}));
+  let benchCursor=0;
+  const roomAllocation=[];
+  selectedRooms.forEach(room=>{
+    const roomPositions=seatingPositionList(room);
+    const remaining=result.benches.length-benchCursor;
+    const benchesForRoom=Math.max(0,Math.min(roomPositions.length,remaining));
+    roomAllocation.push({roomId:room.id,roomNumber:room.room_number,capacity:Number(room.capacity||0),positionsAvailable:roomPositions.length,benchesAssigned:benchesForRoom});
+    for(let i=0;i<benchesForRoom;i++)positions.push({room,row:roomPositions[i].row,column:roomPositions[i].column});
+    benchCursor+=benchesForRoom;
   });
-  if(positions.length<result.benches.length){
-    throw new Error('Selected rooms provide '+positions.length+' physical bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
-  }
+  if(benchCursor<result.benches.length)throw new Error('Selected rooms provide '+benchCursor+' usable bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
   const roomBenchCounters=new Map();
   const assignments=result.benches.map((bench,index)=>{
     const slot=positions[index];
     const nextBenchNumber=(roomBenchCounters.get(slot.room.id)||0)+1;
     roomBenchCounters.set(slot.room.id,nextBenchNumber);
-    return{
-      benchNumber:nextBenchNumber,
-      roomId:slot.room.id,
-      roomNumber:slot.room.room_number,
-      roomName:slot.room.room_name||'',
-      floor:slot.room.floor||'',
-      row:slot.row,
-      column:slot.column,
-      students:bench.students
-    };
+    return{benchNumber:nextBenchNumber,roomId:slot.room.id,roomNumber:slot.room.room_number,roomName:slot.room.room_name||'',floor:slot.room.floor||'',row:slot.row,column:slot.column,students:bench.students};
   });
   const assignedKeys=assignments.flatMap(x=>x.students.map(y=>y.key));
   const uniqueAssigned=new Set(assignedKeys);
   if(uniqueAssigned.size!==assignedKeys.length)throw new Error('Seating generation created duplicate candidate assignments.');
   if(uniqueAssigned.size!==s.candidates.length)throw new Error('Seating generation did not assign every candidate.');
-  assignments.forEach(x=>{
-    if(x.students.length===2&&!seatingPairAllowed(x.students[0],x.students[1]))throw new Error('A generated two-student bench violates the configured pairing rules.');
-  });
-  return{...result,assignments,unusedPositions:positions.length-assignments.length};
+  assignments.forEach(x=>{if(x.students.length===2&&!seatingPairAllowed(x.students[0],x.students[1]))throw new Error('A generated two-student bench violates the configured pairing rules.');});
+  return{...result,assignments,unusedPositions:positions.length-assignments.length,roomAllocation};
 }
 
 function seatingGenerationSummary(plan){
@@ -1114,7 +1109,7 @@ function validateSeatingPlanS7(plan){
     usedBenchKeys.add(benchKey);
     if((a.students||[]).length>Number(s.studentsPerBench||1))errors.push('A bench contains more students than configured.');
     if((a.students||[]).length===2&&!seatingPairAllowed(a.students[0],a.students[1]))errors.push('A two-student bench violates the selected pairing rules in Room '+room.room_number+'.');
-    const positionNumber=(Number(a.row)-1)*columns+Number(a.column);
+    const positionNumber=(Number(a.column)-1)*rows+Number(a.row);
     if(positionNumber>capacity)errors.push('A student is assigned beyond the physical bench capacity of Room '+room.room_number+'.');
   });
   const roomBenchUsage=new Map();
@@ -1230,23 +1225,21 @@ function renderPhysicalSeatingChart(){
     const usedRooms=[...rooms.values()].filter(x=>x.assignments.length);
     const roomSections=usedRooms.map(item=>{
       const room=item.room,rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
-      const roomAssignments=[...item.assignments].sort((a,b)=>a.row-b.row||a.column-b.column);
-      const displayBenchByPosition=new Map();
-      roomAssignments.forEach((a,index)=>displayBenchByPosition.set(a.row+'|'+a.column,index+1));
+      const roomAssignments=[...item.assignments];
       const assignmentMap=new Map(roomAssignments.map(a=>[a.row+'|'+a.column,a]));
+      const benchNumberByPosition=new Map();
+      seatingPositionList(room).forEach((position,index)=>benchNumberByPosition.set(position.row+'|'+position.column,index+1));
       let grid='';
       for(let row=1;row<=rows;row++){
         grid+='<tr><th>Row '+row+'</th>';
         for(let col=1;col<=columns;col++){
-          const positionNumber=(row-1)*columns+col,a=assignmentMap.get(row+'|'+col);
-          if(positionNumber>capacity)grid+='<td class="seat-unused">—</td>';
+          const benchNumber=benchNumberByPosition.get(row+'|'+col)||0,a=assignmentMap.get(row+'|'+col);
+          if(!benchNumber)grid+='<td class="seat-unused">—</td>';
           else if(a){
-            const benchNumber=displayBenchByPosition.get(row+'|'+col)||1;
             const rollText=a.students.map(y=>y.rollNumber+' ('+seatingClassSectionLabel(y.classNumber,y.sectionName)+')').join(' , ');
             grid+='<td class="seat-occupied"><b>'+benchNumber+'</b><div class="seat-roll">'+plannerEscape(rollText)+'</div></td>';
           }else{
-            const nextBench=roomAssignments.length<capacity?positionNumber:'';
-            grid+='<td class="seat-empty"><b>'+nextBench+'</b><div>—</div></td>';
+            grid+='<td class="seat-empty"><b>'+benchNumber+'</b><div>—</div></td>';
           }
         }
         grid+='</tr>';
