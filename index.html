@@ -821,6 +821,15 @@ function renderSeatingRoomSelection(){
   const unavailable=rooms.filter(r=>!(r.status==='Available'&&Number(r.capacity)>0&&Number(r.layout_rows)>0&&Number(r.layout_columns)>0));
   const summary=seatingRoomCapacitySummary();
   const capacityOk=summary.benchCapacity>=summary.requiredBenches;
+  const shortage=Math.max(0,summary.requiredBenches-summary.benchCapacity);
+  const unselectedAvailable=available.filter(r=>!s.selectedRoomIds.has(r.id)).sort((a,b)=>Number(b.capacity||0)-Number(a.capacity||0));
+  let additionalRooms=0,additionalBenchCapacity=0;
+  for(const room of unselectedAvailable){
+    if(additionalBenchCapacity>=shortage)break;
+    additionalBenchCapacity+=Number(room.capacity||0);
+    additionalRooms++;
+  }
+  const roomNeedText=capacityOk?'Selected rooms cover the required bench count.':(additionalRooms?('Need '+shortage+' more bench'+(shortage===1?'':'es')+'; add '+additionalRooms+' room'+(additionalRooms===1?'':'s')+'.'):('Need '+shortage+' more bench'+(shortage===1?'':'es')+'; no additional configured room is available.'));
   const roomCards=available.length?available.map(r=>{
     const checked=s.selectedRoomIds.has(r.id);
     const studentCapacity=Number(r.capacity||0)*Number(s.studentsPerBench||1);
@@ -837,10 +846,10 @@ function renderSeatingRoomSelection(){
     '<div class="cards" style="margin-bottom:16px"><div class="card"><div class="label">Candidates</div><div class="metric">'+summary.requiredStudents+'</div><div class="note">Unique candidates for '+plannerDateLabel(s.examDate)+'</div></div>'+
     '<div class="card"><div class="label">Required Benches</div><div class="metric">'+summary.requiredBenches+'</div><div class="note">'+(s.studentsPerBench===2?'Actual requirement after pairing rules · theoretical minimum '+summary.theoreticalRequiredBenches:'1 student per bench')+'</div></div>'+
     '<div class="card"><div class="label">Selected Benches</div><div class="metric" id="selectedBenchMetric">'+summary.benchCapacity+'</div><div class="note">Across selected rooms</div></div>'+
-    '<div class="card"><div class="label">Capacity Check</div><div class="metric" id="roomCapacityMetric" style="font-size:20px">'+(capacityOk?'READY':'INSUFFICIENT')+'</div><div class="note" id="roomCapacityNote">'+(capacityOk?'Selected rooms cover the required bench count.':('Need '+(summary.requiredBenches-summary.benchCapacity)+' more bench'+(summary.requiredBenches-summary.benchCapacity===1?'':'es')+'.'))+'</div></div></div>'+
+    '<div class="card"><div class="label">Capacity Check</div><div class="metric" id="roomCapacityMetric" style="font-size:20px">'+(capacityOk?'READY':'INSUFFICIENT')+'</div><div class="note" id="roomCapacityNote">'+roomNeedText+'</div></div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Available Rooms</h3><span class="note">'+available.length+' configured room'+(available.length===1?'':'s')+'</span></div>'+
     '<div class="seating-room-grid">'+roomCards+'</div>'+invalidNote+'</div>'+
-    '<div class="setup-note">Capacity validation now uses the actual bench requirement produced by the current pairing rules. For 2 students per bench, the theoretical minimum is '+summary.theoreticalRequiredBenches+' and the current pairing configuration requires '+summary.requiredBenches+' benches ('+summary.pairedCount+' paired, '+summary.singleCount+' single).</div>'+
+    '<div class="setup-note">'+(capacityOk?'Capacity is sufficient for the current seating configuration. ':'Capacity is currently short by '+shortage+' bench'+(shortage===1?'':'es')+'. ')+(s.studentsPerBench===2?'Theoretical minimum: '+summary.theoreticalRequiredBenches+' benches; current selected pairing configuration: '+summary.requiredBenches+' benches ('+summary.pairedCount+' paired, '+summary.singleCount+' single). ':'1 student per bench requires one physical bench per candidate. ')+(capacityOk?'Any same-subject or consecutive-class warning that the user explicitly enabled is treated as an allowed pairing; it is not treated as an error.':roomNeedText)+'</div>'+
     '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="continueSeatingToGeneration()">CONTINUE TO SEATING GENERATION</button></div>');
 }
 function toggleSeatingRoom(roomId){
