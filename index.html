@@ -991,6 +991,101 @@ function seatingGenerationSummary(plan){
   return{rooms:roomMap.size,benches:plan.assignments.length,students:plan.assignments.reduce((n,x)=>n+x.students.length,0),paired:plan.pairedCount,singles:plan.singleCount,unused:plan.unusedPositions,roomMap};
 }
 
+function validateSeatingPlanS7(plan){
+  const s=window.seatingRuleState;
+  const errors=[];
+  if(!s||!plan)errors.push('No generated seating plan is available.');
+  if(!s?.candidates?.length)errors.push('No exam candidates were found.');
+  const candidateMap=new Map((s?.candidates||[]).map(x=>[x.key,x]));
+  const assignedKeys=plan?.assignments?.flatMap(a=>a.students.map(x=>x.key))||[];
+  const uniqueKeys=new Set(assignedKeys);
+  if(assignedKeys.length!==uniqueKeys.size)errors.push('Duplicate candidates detected in the generated seating plan.');
+  if(uniqueKeys.size!==candidateMap.size)errors.push('The generated seating plan does not assign every candidate exactly once.');
+  for(const key of candidateMap.keys())if(!uniqueKeys.has(key))errors.push('Missing candidate: '+key);
+  const roomMap=new Map((s?.selectedRooms||[]).map(r=>[r.id,r]));
+  const usedPositions=new Set();
+  const usedBenchKeys=new Set();
+  (plan?.assignments||[]).forEach(a=>{
+    const room=roomMap.get(a.roomId);
+    if(!room){errors.push('Assignment references a room that is not selected.');return;}
+    const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
+    if(a.row<1||a.row>rows||a.column<1||a.column>columns)errors.push('Assignment is outside the physical layout for Room '+room.room_number+'.');
+    const positionKey=a.roomId+'|'+a.row+'|'+a.column;
+    if(usedPositions.has(positionKey))errors.push('Duplicate physical bench position in Room '+room.room_number+'.');
+    usedPositions.add(positionKey);
+    const benchKey=a.roomId+'|'+a.benchNumber;
+    if(usedBenchKeys.has(benchKey))errors.push('Duplicate bench number in Room '+room.room_number+'.');
+    usedBenchKeys.add(benchKey);
+    if((a.students||[]).length>Number(s.studentsPerBench||1))errors.push('A bench contains more students than configured.');
+    if((a.students||[]).length===2&&!seatingPairAllowed(a.students[0],a.students[1]))errors.push('A two-student bench violates the selected pairing rules in Room '+room.room_number+'.');
+    const positionNumber=(Number(a.row)-1)*columns+Number(a.column);
+    if(positionNumber>capacity)errors.push('A student is assigned beyond the physical bench capacity of Room '+room.room_number+'.');
+  });
+  const roomBenchUsage=new Map();
+  (plan?.assignments||[]).forEach(a=>roomBenchUsage.set(a.roomId,(roomBenchUsage.get(a.roomId)||0)+1));
+  roomBenchUsage.forEach((used,roomId)=>{
+    const room=roomMap.get(roomId);
+    if(room&&used>Number(room.capacity||0))errors.push('Room '+room.room_number+' exceeds its physical bench capacity.');
+  });
+  return{valid:errors.length===0,errors:[...new Set(errors)]};
+}
+
+function renderSeatingValidation(plan){
+  const result=validateSeatingPlanS7(plan);
+  const items=[
+    ['Candidate coverage',result.errors.some(x=>/candidate|Missing/i.test(x))?'FAIL':'PASS'],
+    ['Physical room capacity',result.errors.some(x=>/capacity|layout|position/i.test(x))?'FAIL':'PASS'],
+    ['Duplicate assignments',result.errors.some(x=>/duplicate/i.test(x))?'FAIL':'PASS'],
+    ['Pairing rules',result.errors.some(x=>/pairing/i.test(x))?'FAIL':'PASS']
+  ];
+  const rows=items.map(x=>'<tr><td>'+x[0]+'</td><td><span class="badge" style="'+(x[1]==='PASS'?'background:#eef8f2;color:#218653':'background:#fff1f0;color:#b53a32')+'">'+x[1]+'</span></td></tr>').join('');
+  const errorHtml=result.errors.length?'<div class="error-note" style="margin-top:12px">'+result.errors.map(x=>plannerEscape(x)).join('<br>')+'</div>':'<div class="setup-note" style="margin-top:12px">All validation checks passed. The seating plan is ready to be saved and published.</div>';
+  openModal('<div class="modalhead"><h2>Seating Plan Validation</h2><button class="x" onclick="closeModal()">×</button></div>'+
+    '<p>SeatChart validates candidate coverage, physical room capacity, duplicate assignments and the selected pairing rules before publishing.</p>'+
+    '<div class="card"><div class="tablewrap"><table class="table"><thead><tr><th>Validation</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+errorHtml+'</div>'+
+    '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button>'+(result.valid?'<button class="btn primary" onclick="saveAndPublishSeatingPlan()">SAVE &amp; PUBLISH</button>':'')+'</div>');
+  return result;
+}
+
+async function saveAndPublishSeatingPlan(){
+  const s=window.seatingRuleState;
+  if(!s?.generatedPlan)return toast('Generate the seating plan first.');
+  const validation=validateSeatingPlanS7(s.generatedPlan);
+  if(!validation.valid){toast('Seating plan validation failed.');renderSeatingValidation(s.generatedPlan);return;}
+  try{
+    const existingRes=await db.from('sc_seating_plans').select('id,status').eq('school_id',APP.schoolId).eq('exam_id',s.examId).eq('exam_date',s.examDate).maybeSingle();
+    if(existingRes.error)throw existingRes.error;
+    if(existingRes.data?.status==='Published')return toast('A published seating plan already exists for this exam date.');
+    let planId=existingRes.data?.id;
+    if(planId){
+      const updateRes=await db.from('sc_seating_plans').update({students_per_bench:Number(s.studentsPerBench),status:'Draft',updated_at:new Date().toISOString(),published_at:null}).eq('id',planId).eq('school_id',APP.schoolId);
+      if(updateRes.error)throw updateRes.error;
+      const delRes=await db.from('sc_seating_assignments').delete().eq('seating_plan_id',planId).eq('school_id',APP.schoolId);
+      if(delRes.error)throw delRes.error;
+    }else{
+      const insertRes=await db.from('sc_seating_plans').insert({school_id:APP.schoolId,exam_id:s.examId,exam_date:s.examDate,students_per_bench:Number(s.studentsPerBench),status:'Draft'}).select('id').single();
+      if(insertRes.error)throw insertRes.error;
+      planId=insertRes.data.id;
+    }
+    const rows=[];
+    s.generatedPlan.assignments.forEach(a=>a.students.forEach((student,index)=>rows.push({
+      school_id:APP.schoolId,seating_plan_id:planId,room_id:a.roomId,row_number:a.row,column_number:a.column,bench_number:a.benchNumber,seat_position:index+1,class_id:student.classId,section_id:student.sectionId,roll_number:Number(student.rollNumber),subject_names:student.subjectName||''
+    })));
+    for(let i=0;i<rows.length;i+=500){
+      const res=await db.from('sc_seating_assignments').insert(rows.slice(i,i+500));
+      if(res.error)throw res.error;
+    }
+    const publishRes=await db.from('sc_seating_plans').update({status:'Published',published_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',planId).eq('school_id',APP.schoolId);
+    if(publishRes.error)throw publishRes.error;
+    s.publishedPlanId=planId;
+    closeModal();
+    toast('Seating plan validated and published successfully.');
+  }catch(e){
+    console.error('saveAndPublishSeatingPlan failed',e);
+    toast(e.message||'Unable to publish seating plan');
+  }
+}
+
 function renderPhysicalSeatingChart(){
   const s=window.seatingRuleState;
   const plan=s?.generatedPlan;
@@ -1055,7 +1150,7 @@ function renderSeatingGeneration(){
       '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Room Allocation</h3><span class="badge">VALIDATED</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Room</th><th>Benches Used</th><th>Students</th></tr></thead><tbody>'+roomRows+'</tbody></table></div></div>'+
       '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Generated Seats</h3><span class="note">Showing first '+Math.min(40,plan.assignments.length)+' bench assignments</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Room</th><th>Row</th><th>Column</th><th>Students</th></tr></thead><tbody>'+sample+'</tbody></table></div></div>'+
       '<div class="setup-note">All candidates are assigned exactly once. Two-student benches use only explicitly allowed class pairings and also enforce different subjects and non-consecutive classes. Publishing is not part of S5.</div>'+
-      '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button><button class="btn" onclick="renderPhysicalSeatingChart()">VIEW PHYSICAL SEAT CHART</button><button class="btn primary" onclick="toast(\'S5 seating plan generated successfully.\')">GENERATED PLAN READY</button></div>');
+      '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button><button class="btn" onclick="renderPhysicalSeatingChart()">VIEW PHYSICAL SEAT CHART</button><button class="btn" onclick="renderSeatingValidation(plan)">VALIDATE PLAN</button><button class="btn primary" onclick="saveAndPublishSeatingPlan()">SAVE &amp; PUBLISH</button></div>');
   }catch(e){
     console.error('renderSeatingGeneration failed',e);
     toast(e.message||'Unable to generate seating plan');
