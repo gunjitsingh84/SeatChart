@@ -6,7 +6,7 @@
 <title>SeatChart</title>
 <style>
 :root{--p:#2457d6;--pd:#1d46b0;--ink:#172033;--muted:#6d778b;--bg:#f5f7fb;--white:#fff;--line:#e4e8ef;--good:#218653;--warn:#a66b00;--bad:#c93636;--side:248px;--head:68px}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:14px}button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:none!important}.app{min-height:100vh}.sidebar{position:fixed;inset:0 auto 0 0;width:var(--side);background:#fff;border-right:1px solid var(--line);z-index:20;display:flex;flex-direction:column}.brand{height:var(--head);padding:0 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}.mark{width:34px;height:34px;border-radius:9px;background:var(--p);color:white;display:grid;place-items:center;font-weight:800}.brand b{font-size:19px}.brand small{display:block;color:var(--muted);font-size:8px;letter-spacing:.6px}.nav{padding:15px 11px;overflow:auto}.navlabel{font-size:9px;color:#939aab;font-weight:800;letter-spacing:.8px;padding:13px 10px 6px}.nav a{display:flex;gap:10px;align-items:center;padding:10px;border-radius:8px;color:#596579;text-decoration:none;font-weight:600;font-size:12px;margin:2px 0}.nav a:hover{background:#f5f7fa}.nav a.active{background:#edf2ff;color:var(--p)}.ni{width:19px;text-align:center;font-size:15px}.sideuser{margin-top:auto;border-top:1px solid var(--line);padding:13px}.user{display:flex;align-items:center;gap:9px}.avatar{width:34px;height:34px;border-radius:50%;background:#e9eefb;color:var(--p);display:grid;place-items:center;font-size:11px;font-weight:800}.uname{font-size:11px;font-weight:750}.school{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}.main{margin-left:var(--side);min-height:100vh}.header{height:var(--head);background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 25px;position:sticky;top:0;z-index:10}.hamb{display:none;border:0;background:none;font-size:22px}.headtitle{font-size:14px;font-weight:750}.headright{display:flex;align-items:center;gap:18px}.profile{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:11px;font-weight:650}.profile .avatar{width:30px;height:30px}.content{padding:26px;max-width:1500px;margin:auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:20px}.top h1{font-size:23px;margin:0;letter-spacing:-.5px}.top p{color:var(--muted);font-size:12px;margin:5px 0}.actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:#fff;color:#536075;border-radius:8px;padding:9px 13px;font-size:11px;font-weight:700}.btn.primary{border-color:var(--p);background:var(--p);color:#fff}.btn.primary:hover{background:var(--pd)}.btn.danger{color:var(--bad)}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:17px}.label{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#8a94a5;font-weight:800}.metric{font-size:27px;font-weight:800;margin-top:9px}.note{font-size:10px;color:var(--muted);margin-top:4px}.note.good{color:var(--good)}.cols{display:grid;grid-template-columns:1.5fr .8fr;gap:18px}.cardhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.cardhead h2{font-size:14px;margin:0}.link{font-size:10px;color:var(--p);font-weight:700;cursor:pointer}.exam{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #eef1f5;padding:12px 0}.exam:first-of-type{border-top:0;padding-top:0}.examleft{display:flex;gap:10px;align-items:center}.date{width:41px;height:41px;background:#eff3ff;color:var(--p);border-radius:8px;display:grid;place-items:center;line-height:1}.date strong{font-size:13px}.date small{font-size:7px;text-transform:uppercase;font-weight:800}.ename{font-size:11px;font-weight:750}.emeta{font-size:9px;color:var(--muted);margin-top:3px}.badge{font-size:8px;background:#eef8f2;color:var(--good);border-radius:20px;padding:5px 7px;font-weight:750}.quick{width:100%;display:flex;gap:10px;align-items:center;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px}.qicon{width:29px;height:29px;border-radius:7px;background:#eff3ff;color:var(--p);display:grid;place-items:center;font-weight:800}.quick b{font-size:10px;display:block}.quick span{font-size:8px;color:var(--muted)}.progress{height:8px;background:#edf0f5;border-radius:20px;overflow:hidden}.fill{height:100%;width:68%;background:var(--p)}.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:14px}.field label{display:block;font-size:10px;font-weight:750;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;border:1px solid #d9dee7;border-radius:8px;padding:10px 11px;outline:none;background:#fff;color:var(--ink)}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px #2457d61a}.searchbar{display:flex;gap:9px;margin-bottom:13px}.searchbar input{flex:1}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:9px;background:#fff}.table{width:100%;border-collapse:collapse;min-width:620px}.table th{text-align:left;font-size:9px;color:#8a94a5;text-transform:uppercase;letter-spacing:.5px;padding:12px;border-bottom:1px solid var(--line)}.table td{padding:12px;font-size:11px;border-bottom:1px solid #eef1f5}.table tr:last-child td{border-bottom:0}.actions-cell{white-space:nowrap}.dotgood{color:var(--good);font-weight:700}.modalbg{position:fixed;inset:0;background:#10192a80;z-index:50;display:none;align-items:center;justify-content:center;padding:18px}.modal{width:min(1100px,100%);background:#fff;border-radius:13px;padding:22px;max-height:90vh;overflow:auto}.modal h2{font-size:17px;margin:0 0 5px}.modal p{font-size:11px;color:var(--muted);margin:0 0 18px}.modalhead{display:flex;justify-content:space-between}.x{border:0;background:none;font-size:20px;color:#758095}.section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}.section:first-child{border-top:0;padding-top:0;margin-top:0}.sectitle{font-size:9px;color:#737e91;font-weight:800;letter-spacing:.7px;margin-bottom:12px}.check{display:flex;gap:8px;font-size:10px;color:var(--muted);align-items:flex-start;margin:12px 0}.check input{width:auto}.timeline{border-left:2px solid #e7ebf2;margin-left:8px;padding-left:22px}.event{position:relative;padding:0 0 22px}.event:before{content:"";position:absolute;left:-29px;top:2px;width:10px;height:10px;border-radius:50%;background:var(--p);border:3px solid var(--bg)}.event time{font-size:9px;color:#8a94a5}.event b{display:block;font-size:11px;margin-top:3px}.event span{font-size:9px;color:var(--muted)}.calendar{background:#fff;border:1px solid var(--line);border-radius:11px;overflow:auto}.calhead{display:flex;justify-content:space-between;padding:15px;border-bottom:1px solid var(--line);align-items:center}.calgrid{display:grid;grid-template-columns:repeat(7,minmax(105px,1fr));min-width:735px}.calgrid>div{min-height:90px;border-right:1px solid #eef1f5;border-bottom:1px solid #eef1f5;padding:8px;font-size:10px}.dayname{min-height:auto!important;font-size:9px!important;color:#7b869a;text-transform:uppercase;font-weight:800}.daynum{font-weight:750;font-size:11px}.eventchip{background:#eff3ff;color:var(--p);border-radius:7px;padding:6px;margin-top:8px;font-size:8px}.login{min-height:100vh;display:grid;place-items:center;padding:22px}.loginbox{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:15px;padding:25px}.loginbrand{display:flex;align-items:center;gap:10px;margin-bottom:18px}.error-note{background:#fff0f0;color:#a93232;border:1px solid #ffd2d2;border-radius:8px;padding:9px;font-size:10px;margin-bottom:13px}.setup-note{background:#f3f7ff;color:#50627e;border:1px solid #d7e3ff;border-radius:8px;padding:10px;font-size:10px;margin:10px 0}.roll-tools{display:flex;gap:8px;margin-bottom:10px}.roll-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}.roll-check{display:flex;align-items:center;gap:3px;font-size:9px}.roll-check input{width:auto}.mobile-nav{display:none}.subject-bulk-form{max-width:100%}.subject-bulk-form>.field{margin-bottom:16px}.subject-bulk-row{display:flex;align-items:center;gap:8px;margin-top:9px}.subject-row-number{width:22px;color:var(--muted);font-size:10px;text-align:center}.subject-bulk-row input{flex:1;width:100%;border:1px solid #d9dee7;border-radius:8px;padding:10px 11px;outline:none;background:#fff;color:var(--ink)}.subject-bulk-row input:focus{border-color:var(--p);box-shadow:0 0 0 3px #2457d61a}.subject-add-more{margin-top:12px;text-align:right}.subject-add-more .link{border:0;background:none;padding:0}.subject-list{max-height:430px;overflow:auto;padding-right:2px}.seating-room-grid{.physical-seat-wrap{overflow:auto;padding:4px}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:14px}button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:none!important}.app{min-height:100vh}.sidebar{position:fixed;inset:0 auto 0 0;width:var(--side);background:#fff;border-right:1px solid var(--line);z-index:20;display:flex;flex-direction:column}.brand{height:var(--head);padding:0 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}.mark{width:34px;height:34px;border-radius:9px;background:var(--p);color:white;display:grid;place-items:center;font-weight:800}.brand b{font-size:19px}.brand small{display:block;color:var(--muted);font-size:8px;letter-spacing:.6px}.nav{padding:15px 11px;overflow:auto}.navlabel{font-size:9px;color:#939aab;font-weight:800;letter-spacing:.8px;padding:13px 10px 6px}.nav a{display:flex;gap:10px;align-items:center;padding:10px;border-radius:8px;color:#596579;text-decoration:none;font-weight:600;font-size:12px;margin:2px 0}.nav a:hover{background:#f5f7fa}.nav a.active{background:#edf2ff;color:var(--p)}.ni{width:19px;text-align:center;font-size:15px}.sideuser{margin-top:auto;border-top:1px solid var(--line);padding:13px}.user{display:flex;align-items:center;gap:9px}.avatar{width:34px;height:34px;border-radius:50%;background:#e9eefb;color:var(--p);display:grid;place-items:center;font-size:11px;font-weight:800}.uname{font-size:11px;font-weight:750}.school{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}.main{margin-left:var(--side);min-height:100vh}.header{height:var(--head);background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 25px;position:sticky;top:0;z-index:10}.hamb{display:none;border:0;background:none;font-size:22px}.headtitle{font-size:14px;font-weight:750}.headright{display:flex;align-items:center;gap:18px}.profile{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:11px;font-weight:650}.profile .avatar{width:30px;height:30px}.content{padding:26px;max-width:1500px;margin:auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:20px}.top h1{font-size:23px;margin:0;letter-spacing:-.5px}.top p{color:var(--muted);font-size:12px;margin:5px 0}.actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:#fff;color:#536075;border-radius:8px;padding:9px 13px;font-size:11px;font-weight:700}.btn.primary{border-color:var(--p);background:var(--p);color:#fff}.btn.primary:hover{background:var(--pd)}.btn.danger{color:var(--bad)}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:17px}.label{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#8a94a5;font-weight:800}.metric{font-size:27px;font-weight:800;margin-top:9px}.note{font-size:10px;color:var(--muted);margin-top:4px}.note.good{color:var(--good)}.cols{display:grid;grid-template-columns:1.5fr .8fr;gap:18px}.cardhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.cardhead h2{font-size:14px;margin:0}.link{font-size:10px;color:var(--p);font-weight:700;cursor:pointer}.exam{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #eef1f5;padding:12px 0}.exam:first-of-type{border-top:0;padding-top:0}.examleft{display:flex;gap:10px;align-items:center}.date{width:41px;height:41px;background:#eff3ff;color:var(--p);border-radius:8px;display:grid;place-items:center;line-height:1}.date strong{font-size:13px}.date small{font-size:7px;text-transform:uppercase;font-weight:800}.ename{font-size:11px;font-weight:750}.emeta{font-size:9px;color:var(--muted);margin-top:3px}.badge{font-size:8px;background:#eef8f2;color:var(--good);border-radius:20px;padding:5px 7px;font-weight:750}.quick{width:100%;display:flex;gap:10px;align-items:center;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px}.qicon{width:29px;height:29px;border-radius:7px;background:#eff3ff;color:var(--p);display:grid;place-items:center;font-weight:800}.quick b{font-size:10px;display:block}.quick span{font-size:8px;color:var(--muted)}.progress{height:8px;background:#edf0f5;border-radius:20px;overflow:hidden}.fill{height:100%;width:68%;background:var(--p)}.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:14px}.field label{display:block;font-size:10px;font-weight:750;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;border:1px solid #d9dee7;border-radius:8px;padding:10px 11px;outline:none;background:#fff;color:var(--ink)}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px #2457d61a}.searchbar{display:flex;gap:9px;margin-bottom:13px}.searchbar input{flex:1}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:9px;background:#fff}.table{width:100%;border-collapse:collapse;min-width:620px}.table th{text-align:left;font-size:9px;color:#8a94a5;text-transform:uppercase;letter-spacing:.5px;padding:12px;border-bottom:1px solid var(--line)}.table td{padding:12px;font-size:11px;border-bottom:1px solid #eef1f5}.table tr:last-child td{border-bottom:0}.actions-cell{white-space:nowrap}.dotgood{color:var(--good);font-weight:700}.modalbg{position:fixed;inset:0;background:#10192a80;z-index:50;display:none;align-items:center;justify-content:center;padding:18px}.modal{width:min(1100px,100%);background:#fff;border-radius:13px;padding:22px;max-height:90vh;overflow:auto}.modal h2{font-size:17px;margin:0 0 5px}.modal p{font-size:11px;color:var(--muted);margin:0 0 18px}.modalhead{display:flex;justify-content:space-between}.x{border:0;background:none;font-size:20px;color:#758095}.section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}.section:first-child{border-top:0;padding-top:0;margin-top:0}.sectitle{font-size:9px;color:#737e91;font-weight:800;letter-spacing:.7px;margin-bottom:12px}.check{display:flex;gap:8px;font-size:10px;color:var(--muted);align-items:flex-start;margin:12px 0}.check input{width:auto}.timeline{border-left:2px solid #e7ebf2;margin-left:8px;padding-left:22px}.event{position:relative;padding:0 0 22px}.event:before{content:"";position:absolute;left:-29px;top:2px;width:10px;height:10px;border-radius:50%;background:var(--p);border:3px solid var(--bg)}.event time{font-size:9px;color:#8a94a5}.event b{display:block;font-size:11px;margin-top:3px}.event span{font-size:9px;color:var(--muted)}.calendar{background:#fff;border:1px solid var(--line);border-radius:11px;overflow:auto}.calhead{display:flex;justify-content:space-between;padding:15px;border-bottom:1px solid var(--line);align-items:center}.calgrid{display:grid;grid-template-columns:repeat(7,minmax(105px,1fr));min-width:735px}.calgrid>div{min-height:90px;border-right:1px solid #eef1f5;border-bottom:1px solid #eef1f5;padding:8px;font-size:10px}.dayname{min-height:auto!important;font-size:9px!important;color:#7b869a;text-transform:uppercase;font-weight:800}.daynum{font-weight:750;font-size:11px}.eventchip{background:#eff3ff;color:var(--p);border-radius:7px;padding:6px;margin-top:8px;font-size:8px}.login{min-height:100vh;display:grid;place-items:center;padding:22px}.loginbox{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:15px;padding:25px}.loginbrand{display:flex;align-items:center;gap:10px;margin-bottom:18px}.error-note{background:#fff0f0;color:#a93232;border:1px solid #ffd2d2;border-radius:8px;padding:9px;font-size:10px;margin-bottom:13px}.setup-note{background:#f3f7ff;color:#50627e;border:1px solid #d7e3ff;border-radius:8px;padding:10px;font-size:10px;margin:10px 0}.roll-tools{display:flex;gap:8px;margin-bottom:10px}.roll-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}.roll-check{display:flex;align-items:center;gap:3px;font-size:9px}.roll-check input{width:auto}.mobile-nav{display:none}.subject-bulk-form{max-width:100%}.subject-bulk-form>.field{margin-bottom:16px}.subject-bulk-row{display:flex;align-items:center;gap:8px;margin-top:9px}.subject-row-number{width:22px;color:var(--muted);font-size:10px;text-align:center}.subject-bulk-row input{flex:1;width:100%;border:1px solid #d9dee7;border-radius:8px;padding:10px 11px;outline:none;background:#fff;color:var(--ink)}.subject-bulk-row input:focus{border-color:var(--p);box-shadow:0 0 0 3px #2457d61a}.subject-add-more{margin-top:12px;text-align:right}.subject-add-more .link{border:0;background:none;padding:0}.subject-list{max-height:430px;overflow:auto;padding-right:2px}.seating-room-grid{.seat-layout-table{width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed}.seat-layout-table th{width:58px;background:#f3f5f8;border:1px solid #d9dee7;font-size:9px;color:#68748a}.seat-layout-table td{height:74px;border:1px solid #d9dee7;vertical-align:top;padding:8px;text-align:center}.seat-layout-table .seat-occupied{background:#f7f9ff}.seat-layout-table .seat-empty{background:#fbfcfe;color:#7d8798}.seat-layout-table .seat-unused{background:#f1f2f4;color:#a1a8b3}.seat-roll{font-size:13px;font-weight:750;margin-top:7px;line-height:1.35}.physical-seat-wrap{overflow:auto;padding:4px}
 .physical-seat-table{border-collapse:separate;border-spacing:8px;width:100%;min-width:760px}
 .physical-seat-table th,.physical-seat-table td{border:1px solid #e2e7ef}
 .physical-seat-table .seat-row-label{width:72px;min-width:72px;background:#f7f8fb;color:#68748a;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
@@ -638,61 +638,48 @@ async function exportPublishedSeatingPlan(examId,examDate){
       db.from('sc_sections').select('id,class_id,section_name').eq('school_id',APP.schoolId),
       db.from('sc_exams').select('id,exam_name,paper_start_time,paper_end_time').eq('id',examId).eq('school_id',APP.schoolId).single()
     ]);
-    if(planRes.error)throw planRes.error;
-    if(assignRes.error)throw assignRes.error;
-    if(roomRes.error)throw roomRes.error;
-    if(classRes.error)throw classRes.error;
-    if(sectionRes.error)throw sectionRes.error;
-    if(examRes.error)throw examRes.error;
-    const plan=planRes.data;
-    if(!plan)return toast('No published seating plan exists for this exam date.');
-    const assignments=(assignRes.data||[]).filter(x=>x.seating_plan_id===plan.id);
-    if(!assignments.length)return toast('The published seating plan has no seat assignments.');
-    const rooms=new Map((roomRes.data||[]).map(x=>[x.id,x]));
-    const classes=new Map((classRes.data||[]).map(x=>[x.id,x]));
-    const sections=new Map((sectionRes.data||[]).map(x=>[x.id,x]));
-    const school=APP.profile?.sc_schools||{};
-    const esc=v=>plannerEscape(v);
-    const logo=school.logo_url?'<img class="school-logo" src="'+esc(school.logo_url)+'" alt="School Logo">':'<div class="logo-placeholder">SC</div>';
+    if(planRes.error)throw planRes.error;if(assignRes.error)throw assignRes.error;if(roomRes.error)throw roomRes.error;if(classRes.error)throw classRes.error;if(sectionRes.error)throw sectionRes.error;if(examRes.error)throw examRes.error;
+    const plan=planRes.data;if(!plan)return toast('No published seating plan exists for this exam date.');
+    const assignments=(assignRes.data||[]).filter(x=>x.seating_plan_id===plan.id);if(!assignments.length)return toast('The published seating plan has no seat assignments.');
+    const rooms=new Map((roomRes.data||[]).map(x=>[x.id,x])),classes=new Map((classRes.data||[]).map(x=>[x.id,x])),sections=new Map((sectionRes.data||[]).map(x=>[x.id,x]));
+    const school=APP.profile?.sc_schools||{},esc=v=>plannerEscape(v),logo=school.logo_url?'<img class="school-logo" src="'+esc(school.logo_url)+'" alt="School Logo">':'<div class="logo-placeholder">SC</div>';
+    const consolidatedMap=new Map();
+    assignments.forEach(a=>{
+      const cls=classes.get(a.class_id),key=a.class_id+'|'+a.subject_names;
+      if(!consolidatedMap.has(key))consolidatedMap.set(key,{classNumber:cls?.class_number||'—',subjectName:a.subject_names||'—',rolls:[]});
+      consolidatedMap.get(key).rolls.push(Number(a.roll_number));
+    });
+    const consolidated=[...consolidatedMap.values()].sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))).map(x=>{
+      const rolls=[...new Set(x.rolls)].sort((a,b)=>a-b);let ranges=[],startRoll=rolls[0],prev=rolls[0];
+      for(let i=1;i<rolls.length;i++){if(rolls[i]===prev+1){prev=rolls[i];continue;}ranges.push(startRoll===prev?String(startRoll):startRoll+'-'+prev);startRoll=prev=rolls[i];}
+      if(rolls.length)ranges.push(startRoll===prev?String(startRoll):startRoll+'-'+prev);
+      return '<tr><td>Class '+esc(x.classNumber)+'</td><td>'+esc(x.subjectName)+'</td><td>'+esc(ranges.join(', '))+'</td></tr>';
+    }).join('');
     const roomIds=[...new Set(assignments.map(x=>x.room_id))];
     const roomPages=roomIds.map(roomId=>{
-      const room=rooms.get(roomId);
-      if(!room)throw new Error('A published assignment references a missing room.');
+      const room=rooms.get(roomId);if(!room)throw new Error('A published assignment references a missing room.');
       const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
       if(!rows||!columns||rows*columns<capacity)throw new Error('Room '+String(room.room_number||'')+' has an invalid physical layout.');
-      const byPosition=new Map();
-      assignments.filter(x=>x.room_id===roomId).forEach(a=>{
-        const key=a.row_number+'|'+a.column_number;
-        if(!byPosition.has(key))byPosition.set(key,[]);
-        byPosition.get(key).push(a);
-      });
+      const byPosition=new Map();assignments.filter(x=>x.room_id===roomId).forEach(a=>{const key=a.row_number+'|'+a.column_number;if(!byPosition.has(key))byPosition.set(key,[]);byPosition.get(key).push(a);});
       let grid='';
       for(let row=1;row<=rows;row++){
-        grid+='<tr><th class="row-label">Row '+row+'</th>';
+        grid+='<tr><th>Row '+row+'</th>';
         for(let col=1;col<=columns;col++){
-          const positionNumber=(row-1)*columns+col;
-          const seats=byPosition.get(row+'|'+col)||[];
-          if(positionNumber>capacity)grid+='<td class="unused">Unused position</td>';
+          const pos=(row-1)*columns+col,seats=byPosition.get(row+'|'+col)||[];
+          if(pos>capacity)grid+='<td class="unused">—</td>';
           else{
-            const benchNumber=seats[0]?.bench_number||positionNumber;
-            const students=seats.map(a=>{
-              const cls=classes.get(a.class_id),sec=sections.get(a.section_id);
-              return '<div class="student"><b>Class '+esc(cls?.class_number||'—')+' · '+esc(sec?.section_name||'—')+'</b><br>Roll '+esc(a.roll_number)+'<br><span>'+esc(a.subject_names||'—')+'</span></div>';
-            }).join('');
-            grid+='<td class="'+(students?'occupied':'empty')+'"><div class="bench"><div class="bench-no">Bench '+esc(benchNumber)+'</div>'+(students||'<span>Not allocated</span>')+'</div></td>';
+            const bench=seats[0]?.bench_number||pos;
+            const students=seats.map(a=>{const cls=classes.get(a.class_id);return '<div class="student"><b>'+esc(a.roll_number)+' ('+esc(seatingClassLabel(cls?.class_number)) +')</b></div>';}).join('');
+            grid+='<td class="'+(students?'occupied':'empty')+'"><div class="bench"><div class="bench-no">Bench '+esc(bench)+'</div>'+(students||'—')+'</div></td>';
           }
         }
         grid+='</tr>';
       }
-      const assigned=assignments.filter(x=>x.room_id===roomId);
-      const students=assigned.length,benches=new Set(assigned.map(x=>x.bench_number)).size;
-      return '<section class="room-page"><div class="room-header"><div class="brand">'+logo+'<div><div class="school-name">'+esc(school.name||'School')+'</div><div class="document-title">ROOM-WISE SEATING PLAN</div><div class="exam-name">'+esc(examRes.data.exam_name)+'</div><div class="meta">'+esc(plannerDateLabel(examDate))+' · '+esc(plannerDayName(examDate))+' · '+esc(String(examRes.data.paper_start_time).slice(0,5))+' – '+esc(String(examRes.data.paper_end_time).slice(0,5))+'</div></div></div><div class="room-meta"><b>Room '+esc(room.room_number)+'</b><br>'+esc(room.room_name||'Unnamed room')+(room.floor?' · '+esc(room.floor):'')+'<br>'+rows+' × '+columns+' layout · '+capacity+' benches<br>'+students+' students · '+benches+' benches used</div></div><table class="seat-table"><tbody>'+grid+'</tbody></table><div class="footer"><span>School Examination & Seating Management</span><span>Published seating plan</span></div></section>';
+      const used=new Set(assignments.filter(x=>x.room_id===roomId).map(x=>x.bench_number)).size;
+      return '<section class="room-page"><div class="room-header"><div class="brand">'+logo+'<div><div class="school-name">'+esc(school.name||'School')+'</div><div class="document-title">ROOM-WISE SEATING PLAN</div><div class="exam-name">'+esc(examRes.data.exam_name)+'</div><div class="meta">'+esc(plannerDateLabel(examDate))+' · '+esc(plannerDayName(examDate))+' · '+esc(String(examRes.data.paper_start_time).slice(0,5))+' – '+esc(String(examRes.data.paper_end_time).slice(0,5))+'</div></div></div><div class="room-meta"><b>Room '+esc(room.room_number)+'</b><br>'+esc(room.room_name||'Unnamed room')+(room.floor?' · '+esc(room.floor):'')+'<br>'+rows+' × '+columns+' · '+capacity+' benches<br>'+used+' benches used</div></div><table class="seat-table"><tbody>'+grid+'</tbody></table><div class="footer"><span>School Examination & Seating Management</span><span>Published seating plan</span></div></section>';
     }).join('');
-    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(examRes.data.exam_name)+' - Seating '+esc(plannerDateLabel(examDate))+'</title><style>'+
-      '@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;font-size:10px}.room-page{page-break-after:always;min-height:180mm}.room-page:last-child{page-break-after:auto}.room-header{display:flex;justify-content:space-between;gap:18px;border-bottom:2px solid #172033;padding-bottom:8px;margin-bottom:9px}.brand{display:flex;align-items:center;gap:9px}.school-logo,.logo-placeholder{width:42px;height:42px;object-fit:contain}.logo-placeholder{border:2px solid #2457d6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#2457d6}.school-name{font-size:16px;font-weight:800}.document-title{font-size:12px;font-weight:800;margin-top:3px}.exam-name{font-size:11px;font-weight:700;margin-top:2px}.meta{font-size:9px;color:#596579;margin-top:2px}.room-meta{text-align:right;line-height:1.45;color:#596579}.room-meta b{font-size:14px;color:#172033}.seat-table{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}.seat-table td,.seat-table th{border:1px solid #cbd2dd}.seat-table .row-label{width:46px;background:#f2f4f8;text-align:center;font-size:8px;color:#596579}.seat-table td{height:60px;vertical-align:top}.seat-table .occupied{background:#f7f9ff}.seat-table .empty{background:#fbfcfe}.seat-table .unused{background:#f1f2f4;color:#969eaa;text-align:center;vertical-align:middle;font-size:8px}.bench{padding:4px}.bench-no{font-size:8px;font-weight:800;color:#53627a;margin-bottom:3px}.student{font-size:8px;line-height:1.25;border-top:1px solid #dfe4ec;padding:3px 0}.student:first-of-type{border-top:0}.student span{font-size:7px;color:#596579}.footer{display:flex;justify-content:space-between;margin-top:8px;font-size:8px;color:#68748a}@media print{.room-page{break-after:page}.room-page:last-child{break-after:auto}}'+
-      '</style></head><body>'+roomPages+'</body></html>';
-    const win=window.open('','_blank','width=1400,height=900');
-    if(!win)return toast('Please allow pop-ups to print the seating plan.');
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(examRes.data.exam_name)+' - Seating '+esc(plannerDateLabel(examDate))+'</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;font-size:10px}.summary-page{page-break-after:always}.summary-title{text-align:center;border-bottom:2px solid #172033;padding-bottom:10px;margin-bottom:12px}.school-logo,.logo-placeholder{width:44px;height:44px;object-fit:contain}.logo-placeholder{border:2px solid #2457d6;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#2457d6}.summary-brand{text-align:center}.school-name{font-size:17px;font-weight:800}.document-title{font-size:12px;font-weight:800;margin-top:3px}.summary-table{width:100%;border-collapse:collapse}.summary-table th,.summary-table td{border:1px solid #bfc7d4;padding:7px;text-align:left}.summary-table th{background:#eef2f8}.room-page{page-break-after:always;min-height:180mm}.room-page:last-child{page-break-after:auto}.room-header{display:flex;justify-content:space-between;gap:18px;border-bottom:2px solid #172033;padding-bottom:8px;margin-bottom:9px}.brand{display:flex;align-items:center;gap:9px}.school-name{font-size:16px;font-weight:800}.exam-name{font-size:11px;font-weight:700;margin-top:2px}.meta{font-size:9px;color:#596579;margin-top:2px}.room-meta{text-align:right;line-height:1.45;color:#596579}.room-meta b{font-size:14px;color:#172033}.seat-table{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}.seat-table td,.seat-table th{border:1px solid #cbd2dd}.seat-table th{width:46px;background:#f2f4f8;text-align:center;font-size:8px;color:#596579}.seat-table td{height:54px;vertical-align:top}.seat-table .occupied{background:#f7f9ff}.seat-table .empty{background:#fbfcfe}.seat-table .unused{background:#f1f2f4;color:#969eaa;text-align:center;vertical-align:middle}.bench{padding:4px}.bench-no{font-size:8px;font-weight:800;color:#53627a;margin-bottom:4px}.student{font-size:9px;line-height:1.3}.footer{display:flex;justify-content:space-between;margin-top:7px;font-size:8px;color:#68748a}@media print{.room-page{break-after:page}.room-page:last-child{break-after:auto}.summary-page{break-after:page}}</style></head><body><section class="summary-page"><div class="summary-title"><div class="summary-brand">'+logo+'<div class="school-name">'+esc(school.name||'School')+'</div><div class="document-title">CONSOLIDATED SEATING CANDIDATE LIST</div><div>'+esc(examRes.data.exam_name)+' · '+esc(plannerDateLabel(examDate))+'</div></div></div><table class="summary-table"><thead><tr><th>Class</th><th>Subject</th><th>Roll Numbers</th></tr></thead><tbody>'+consolidated+'</tbody></table></section>'+roomPages+'</body></html>';
+    const win=window.open('','_blank','width=1400,height=900');if(!win)return toast('Please allow pop-ups to print the seating plan.');
     win.document.open();win.document.write(html);win.document.close();setTimeout(()=>win.print(),400);
   }catch(e){console.error('exportPublishedSeatingPlan failed',e);toast(e.message||'Unable to export seating plan');}
 }
@@ -1028,10 +1015,13 @@ function generateSeatingPlan(){
   if(positions.length<result.benches.length){
     throw new Error('Selected rooms provide '+positions.length+' physical bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
   }
+  const roomBenchCounters=new Map();
   const assignments=result.benches.map((bench,index)=>{
     const slot=positions[index];
+    const nextBenchNumber=(roomBenchCounters.get(slot.room.id)||0)+1;
+    roomBenchCounters.set(slot.room.id,nextBenchNumber);
     return{
-      benchNumber:index+1,
+      benchNumber:nextBenchNumber,
       roomId:slot.room.id,
       roomNumber:slot.room.room_number,
       roomName:slot.room.room_name||'',
@@ -1157,52 +1147,72 @@ async function saveAndPublishSeatingPlan(){
   }
 }
 
+function seatingClassLabel(classNumber){
+  const n=Number(classNumber);
+  if(n===10)return 'X';
+  if(n===11)return 'XI';
+  if(n===12)return 'XII';
+  return String(n);
+}
+function consolidateSeatingSubjects(assignments){
+  const map=new Map();
+  assignments.forEach(a=>a.students.forEach(student=>{
+    const key=student.classId+'|'+student.subjectName;
+    if(!map.has(key))map.set(key,{classNumber:student.classNumber,subjectName:student.subjectName,rolls:[]});
+    map.get(key).rolls.push(Number(student.rollNumber));
+  }));
+  const rangeText=rolls=>{
+    const sorted=[...new Set(rolls)].sort((a,b)=>a-b);
+    if(!sorted.length)return '';
+    const ranges=[];let start=sorted[0],prev=sorted[0];
+    for(let i=1;i<sorted.length;i++){
+      if(sorted[i]===prev+1){prev=sorted[i];continue;}
+      ranges.push(start===prev?String(start):start+'-'+prev);start=prev=sorted[i];
+    }
+    ranges.push(start===prev?String(start):start+'-'+prev);
+    return ranges.join(', ');
+  };
+  return [...map.values()].sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))).map(x=>({
+    classNumber:x.classNumber,
+    subjectName:x.subjectName,
+    rollText:rangeText(x.rolls)
+  }));
+}
 function renderPhysicalSeatingChart(){
-  const s=window.seatingRuleState;
-  const plan=s?.generatedPlan;
+  const s=window.seatingRuleState,plan=s?.generatedPlan;
   if(!s||!plan)return toast('Generate the seating plan first.');
   try{
     const rooms=new Map();
     (s.selectedRooms||[]).forEach(room=>rooms.set(room.id,{room,assignments:[]}));
-    plan.assignments.forEach(a=>{
-      if(!rooms.has(a.roomId))rooms.set(a.roomId,{room:{id:a.roomId,room_number:a.roomNumber,room_name:a.roomName,floor:a.floor,capacity:0,layout_rows:0,layout_columns:0},assignments:[]});
-      rooms.get(a.roomId).assignments.push(a);
-    });
-    const roomSections=[...rooms.values()].map((item,index)=>{
-      const room=item.room;
-      const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
-      if(!rows||!columns)throw new Error('Room '+String(room.room_number||'')+' has no valid physical layout.');
+    plan.assignments.forEach(a=>{if(rooms.has(a.roomId))rooms.get(a.roomId).assignments.push(a);});
+    const usedRooms=[...rooms.values()].filter(x=>x.assignments.length);
+    const roomSections=usedRooms.map(item=>{
+      const room=item.room,rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
       const assignmentMap=new Map(item.assignments.map(a=>[a.row+'|'+a.column,a]));
       let grid='';
       for(let row=1;row<=rows;row++){
-        grid+='<tr><th class="seat-row-label">Row '+row+'</th>';
-        for(let column=1;column<=columns;column++){
-          const a=assignmentMap.get(row+'|'+column);
-          const positionNumber=(row-1)*columns+column;
-          if(a){
-            const studentHtml=a.students.map(y=>'<div class="seat-student"><b>Class '+y.classNumber+'</b> · '+plannerEscape(y.sectionName)+' · Roll '+y.rollNumber+'<br><span>'+plannerEscape(y.subjectName)+'</span></div>').join('');
-            grid+='<td class="seat-cell occupied"><div class="seat-bench"><div class="seat-bench-head">Bench '+a.benchNumber+'</div>'+studentHtml+'</div></td>';
-          }else if(positionNumber<=capacity){
-            grid+='<td class="seat-cell empty"><div class="seat-bench"><div class="seat-bench-head">Bench '+positionNumber+'</div><span>Not allocated</span></div></td>';
-          }else{
-            grid+='<td class="seat-cell unused"><span>Unused position</span></td>';
-          }
+        grid+='<tr><th>Row '+row+'</th>';
+        for(let col=1;col<=columns;col++){
+          const positionNumber=(row-1)*columns+col,a=assignmentMap.get(row+'|'+col);
+          if(positionNumber>capacity)grid+='<td class="seat-unused">—</td>';
+          else if(a){
+            const rollText=a.students.map(y=>y.rollNumber+' ('+seatingClassLabel(y.classNumber)+')').join(' , ');
+            grid+='<td class="seat-occupied"><b>'+a.benchNumber+'</b><div class="seat-roll">'+plannerEscape(rollText)+'</div></td>';
+          }else grid+='<td class="seat-empty"><b>'+positionNumber+'</b><div>—</div></td>';
         }
         grid+='</tr>';
       }
-      return '<div class="card physical-room-chart" style="margin-bottom:18px"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' layout · '+capacity+' benches</div></div><span class="badge">'+item.assignments.length+' benches used</span></div><div class="tablewrap physical-seat-wrap"><table class="physical-seat-table"><tbody>'+grid+'</tbody></table></div></div>';
+      return '<div class="card physical-room-chart"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' · '+capacity+' benches</div></div><span class="badge">'+item.assignments.length+' benches used</span></div><div class="tablewrap"><table class="seat-layout-table"><tbody>'+grid+'</tbody></table></div></div>';
     }).join('');
-    openModal('<div class="modalhead"><h2>Physical Room Seating Chart</h2><button class="x" onclick="closeModal()">×</button></div>'+
-      '<p>Physical seating layout for '+plannerDateLabel(s.examDate)+'. Each room is shown using its configured rows and columns. Unused layout positions are shown separately from physical benches.</p>'+
-      '<div class="setup-note" style="margin-bottom:16px"><b>Legend:</b> Occupied = assigned bench · Not allocated = physical bench not used in this plan · Unused position = layout space beyond the room bench capacity.</div>'+
+    const consolidated=consolidateSeatingSubjects(plan.assignments).map(x=>'<tr><td>Class '+plannerEscape(x.classNumber)+'</td><td>'+plannerEscape(x.subjectName)+'</td><td>'+plannerEscape(x.rollText)+'</td></tr>').join('');
+    openModal('<div class="modalhead"><h2>Physical Seating Chart</h2><button class="x" onclick="closeModal()">×</button></div>'+
+      '<p>'+plannerDateLabel(s.examDate)+' · '+s.candidates.length+' candidates · '+usedRooms.length+' rooms used.</p>'+
+      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Consolidated Candidate List</h3><span class="note">Class + subject + roll ranges</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class</th><th>Subject</th><th>Roll Numbers</th></tr></thead><tbody>'+consolidated+'</tbody></table></div></div>'+
+      '<div class="setup-note" style="margin-bottom:16px"><b>Seat format:</b> Bench number is shown first. Roll numbers are followed by the class in brackets — e.g. <b>1 (3)</b> or <b>22 (X)</b>.</div>'+
       roomSections+
       '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button></div>');
-  }catch(e){
-    console.error('renderPhysicalSeatingChart failed',e);
-    toast(e.message||'Unable to render physical seating chart');
-  }
+  }catch(e){console.error('renderPhysicalSeatingChart failed',e);toast(e.message||'Unable to render physical seating chart');}
 }
-
 function renderSeatingGeneration(){
   const s=window.seatingRuleState;
   if(!s)return;
