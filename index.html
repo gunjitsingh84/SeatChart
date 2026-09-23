@@ -1028,10 +1028,13 @@ function generateSeatingPlan(){
   if(positions.length<result.benches.length){
     throw new Error('Selected rooms provide '+positions.length+' physical bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
   }
+  const roomBenchCounters=new Map();
   const assignments=result.benches.map((bench,index)=>{
     const slot=positions[index];
+    const nextBenchNumber=(roomBenchCounters.get(slot.room.id)||0)+1;
+    roomBenchCounters.set(slot.room.id,nextBenchNumber);
     return{
-      benchNumber:index+1,
+      benchNumber:nextBenchNumber,
       roomId:slot.room.id,
       roomNumber:slot.room.room_number,
       roomName:slot.room.room_name||'',
@@ -1157,52 +1160,72 @@ async function saveAndPublishSeatingPlan(){
   }
 }
 
+function seatingClassLabel(classNumber){
+  const n=Number(classNumber);
+  if(n===10)return 'X';
+  if(n===11)return 'XI';
+  if(n===12)return 'XII';
+  return String(n);
+}
+function consolidateSeatingSubjects(assignments){
+  const map=new Map();
+  assignments.forEach(a=>a.students.forEach(student=>{
+    const key=student.classId+'|'+student.subjectName;
+    if(!map.has(key))map.set(key,{classNumber:student.classNumber,subjectName:student.subjectName,rolls:[]});
+    map.get(key).rolls.push(Number(student.rollNumber));
+  }));
+  const rangeText=rolls=>{
+    const sorted=[...new Set(rolls)].sort((a,b)=>a-b);
+    if(!sorted.length)return '';
+    const ranges=[];let start=sorted[0],prev=sorted[0];
+    for(let i=1;i<sorted.length;i++){
+      if(sorted[i]===prev+1){prev=sorted[i];continue;}
+      ranges.push(start===prev?String(start):start+'-'+prev);start=prev=sorted[i];
+    }
+    ranges.push(start===prev?String(start):start+'-'+prev);
+    return ranges.join(', ');
+  };
+  return [...map.values()].sort((a,b)=>Number(a.classNumber)-Number(b.classNumber)||String(a.subjectName).localeCompare(String(b.subjectName))).map(x=>({
+    classNumber:x.classNumber,
+    subjectName:x.subjectName,
+    rollText:rangeText(x.rolls)
+  }));
+}
 function renderPhysicalSeatingChart(){
-  const s=window.seatingRuleState;
-  const plan=s?.generatedPlan;
+  const s=window.seatingRuleState,plan=s?.generatedPlan;
   if(!s||!plan)return toast('Generate the seating plan first.');
   try{
     const rooms=new Map();
     (s.selectedRooms||[]).forEach(room=>rooms.set(room.id,{room,assignments:[]}));
-    plan.assignments.forEach(a=>{
-      if(!rooms.has(a.roomId))rooms.set(a.roomId,{room:{id:a.roomId,room_number:a.roomNumber,room_name:a.roomName,floor:a.floor,capacity:0,layout_rows:0,layout_columns:0},assignments:[]});
-      rooms.get(a.roomId).assignments.push(a);
-    });
-    const roomSections=[...rooms.values()].map((item,index)=>{
-      const room=item.room;
-      const rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
-      if(!rows||!columns)throw new Error('Room '+String(room.room_number||'')+' has no valid physical layout.');
+    plan.assignments.forEach(a=>{if(rooms.has(a.roomId))rooms.get(a.roomId).assignments.push(a);});
+    const usedRooms=[...rooms.values()].filter(x=>x.assignments.length);
+    const roomSections=usedRooms.map(item=>{
+      const room=item.room,rows=Number(room.layout_rows||0),columns=Number(room.layout_columns||0),capacity=Number(room.capacity||0);
       const assignmentMap=new Map(item.assignments.map(a=>[a.row+'|'+a.column,a]));
       let grid='';
       for(let row=1;row<=rows;row++){
-        grid+='<tr><th class="seat-row-label">Row '+row+'</th>';
-        for(let column=1;column<=columns;column++){
-          const a=assignmentMap.get(row+'|'+column);
-          const positionNumber=(row-1)*columns+column;
-          if(a){
-            const studentHtml=a.students.map(y=>'<div class="seat-student"><b>Class '+y.classNumber+'</b> · '+plannerEscape(y.sectionName)+' · Roll '+y.rollNumber+'<br><span>'+plannerEscape(y.subjectName)+'</span></div>').join('');
-            grid+='<td class="seat-cell occupied"><div class="seat-bench"><div class="seat-bench-head">Bench '+a.benchNumber+'</div>'+studentHtml+'</div></td>';
-          }else if(positionNumber<=capacity){
-            grid+='<td class="seat-cell empty"><div class="seat-bench"><div class="seat-bench-head">Bench '+positionNumber+'</div><span>Not allocated</span></div></td>';
-          }else{
-            grid+='<td class="seat-cell unused"><span>Unused position</span></td>';
-          }
+        grid+='<tr><th>Row '+row+'</th>';
+        for(let col=1;col<=columns;col++){
+          const positionNumber=(row-1)*columns+col,a=assignmentMap.get(row+'|'+col);
+          if(positionNumber>capacity)grid+='<td class="seat-unused">—</td>';
+          else if(a){
+            const rollText=a.students.map(y=>y.rollNumber+' ('+seatingClassLabel(y.classNumber)+')').join(' , ');
+            grid+='<td class="seat-occupied"><b>'+a.benchNumber+'</b><div class="seat-roll">'+plannerEscape(rollText)+'</div></td>';
+          }else grid+='<td class="seat-empty"><b>'+positionNumber+'</b><div>—</div></td>';
         }
         grid+='</tr>';
       }
-      return '<div class="card physical-room-chart" style="margin-bottom:18px"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' layout · '+capacity+' benches</div></div><span class="badge">'+item.assignments.length+' benches used</span></div><div class="tablewrap physical-seat-wrap"><table class="physical-seat-table"><tbody>'+grid+'</tbody></table></div></div>';
+      return '<div class="card physical-room-chart"><div class="cardhead"><div><h3 style="margin:0">Room '+plannerEscape(room.room_number)+'</h3><div class="note">'+plannerEscape(room.room_name||'Unnamed room')+(room.floor?' · '+plannerEscape(room.floor):'')+' · '+rows+' × '+columns+' · '+capacity+' benches</div></div><span class="badge">'+item.assignments.length+' benches used</span></div><div class="tablewrap"><table class="seat-layout-table"><tbody>'+grid+'</tbody></table></div></div>';
     }).join('');
-    openModal('<div class="modalhead"><h2>Physical Room Seating Chart</h2><button class="x" onclick="closeModal()">×</button></div>'+
-      '<p>Physical seating layout for '+plannerDateLabel(s.examDate)+'. Each room is shown using its configured rows and columns. Unused layout positions are shown separately from physical benches.</p>'+
-      '<div class="setup-note" style="margin-bottom:16px"><b>Legend:</b> Occupied = assigned bench · Not allocated = physical bench not used in this plan · Unused position = layout space beyond the room bench capacity.</div>'+
+    const consolidated=consolidateSeatingSubjects(plan.assignments).map(x=>'<tr><td>Class '+plannerEscape(x.classNumber)+'</td><td>'+plannerEscape(x.subjectName)+'</td><td>'+plannerEscape(x.rollText)+'</td></tr>').join('');
+    openModal('<div class="modalhead"><h2>Physical Seating Chart</h2><button class="x" onclick="closeModal()">×</button></div>'+
+      '<p>'+plannerDateLabel(s.examDate)+' · '+s.candidates.length+' candidates · '+usedRooms.length+' rooms used.</p>'+
+      '<div class="card" style="margin-bottom:16px"><div class="cardhead"><h3 style="margin:0">Consolidated Candidate List</h3><span class="note">Class + subject + roll ranges</span></div><div class="tablewrap"><table class="table"><thead><tr><th>Class</th><th>Subject</th><th>Roll Numbers</th></tr></thead><tbody>'+consolidated+'</tbody></table></div></div>'+
+      '<div class="setup-note" style="margin-bottom:16px"><b>Seat format:</b> Bench number is shown first. Roll numbers are followed by the class in brackets — e.g. <b>1 (3)</b> or <b>22 (X)</b>.</div>'+
       roomSections+
       '<div style="text-align:right;margin-top:16px"><button class="btn" onclick="closeModal()">CLOSE</button></div>');
-  }catch(e){
-    console.error('renderPhysicalSeatingChart failed',e);
-    toast(e.message||'Unable to render physical seating chart');
-  }
+  }catch(e){console.error('renderPhysicalSeatingChart failed',e);toast(e.message||'Unable to render physical seating chart');}
 }
-
 function renderSeatingGeneration(){
   const s=window.seatingRuleState;
   if(!s)return;
