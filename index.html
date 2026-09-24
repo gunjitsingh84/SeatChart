@@ -127,21 +127,37 @@ openModal(`<div class="modalhead"><h2>Class ${classNo} — Sections</h2><button 
 }
 async function deleteSectionDb(sectionId,classNo,sectionName){
 if(!confirm('Delete Section '+sectionName+' from Class '+classNo+'? This cannot be undone.'))return;
-const rr=await db.from('sc_subject_rolls').select('id').eq('section_id',sectionId).limit(1);
+const rr=await db.from('sc_subject_rolls').select('id').eq('school_id',APP.schoolId).eq('section_id',sectionId).limit(1);
 if(rr.error)return toast(rr.error.message);
-if(rr.data?.length)return toast('Section '+sectionName+' has roll-number assignments. Remove those assignments before deleting the section.');
-const d=await db.from('sc_sections').delete().eq('id',sectionId);
+if(rr.data?.length)return toast('Section '+sectionName+' has roll-number assignments. Remove those assignments first.');
+const sr=await db.from('sc_seating_assignments').select('id').eq('school_id',APP.schoolId).eq('section_id',sectionId).limit(1);
+if(sr.error)return toast(sr.error.message);
+if(sr.data?.length)return toast('Section '+sectionName+' cannot be deleted because seating assignments exist. Remove the seating plan first.');
+const d=await db.from('sc_sections').delete().eq('school_id',APP.schoolId).eq('id',sectionId);
 if(d.error)return toast(d.error.message);
 await logHistory('Deleted','Section',sectionId,'Section '+sectionName+' deleted from Class '+classNo);
 closeModal();toast('Section '+sectionName+' deleted');loadClasses()
 }
 async function deleteClassDb(id,classNo){
 if(!confirm('Delete Class '+classNo+' and all its sections? This cannot be undone.'))return;
-const sub=await db.from('sc_subjects').select('id').eq('class_id',id).limit(1);if(sub.data?.length)return toast('Class '+classNo+' has subjects mapped to it. Remove those subjects before deleting the class.');
-const sections=await db.from('sc_sections').select('id').eq('class_id',id);if(sections.error)return toast(sections.error.message);
+const sub=await db.from('sc_subjects').select('id').eq('school_id',APP.schoolId).eq('class_id',id).limit(1);
+if(sub.error)return toast(sub.error.message);
+if(sub.data?.length)return toast('Class '+classNo+' has subjects mapped to it. Remove those subjects first.');
+const sections=await db.from('sc_sections').select('id').eq('school_id',APP.schoolId).eq('class_id',id);
+if(sections.error)return toast(sections.error.message);
 const ids=(sections.data||[]).map(x=>x.id);
-if(ids.length){const rolls=await db.from('sc_subject_rolls').select('id').in('section_id',ids).limit(1);if(rolls.data?.length)return toast('This class has roll-number assignments. Remove them before deleting the class.');const e=await db.from('sc_sections').delete().in('id',ids);if(e.error)return toast(e.error.message)}
-const e=await db.from('sc_classes').delete().eq('id',id);if(e.error)return toast(e.error.message);
+if(ids.length){
+  const rolls=await db.from('sc_subject_rolls').select('id').eq('school_id',APP.schoolId).in('section_id',ids).limit(1);
+  if(rolls.error)return toast(rolls.error.message);
+  if(rolls.data?.length)return toast('Class '+classNo+' has roll-number assignments. Remove those assignments first.');
+  const seats=await db.from('sc_seating_assignments').select('id').eq('school_id',APP.schoolId).in('section_id',ids).limit(1);
+  if(seats.error)return toast(seats.error.message);
+  if(seats.data?.length)return toast('Class '+classNo+' cannot be deleted because seating assignments exist. Remove the seating plan first.');
+  const e=await db.from('sc_sections').delete().eq('school_id',APP.schoolId).in('id',ids);
+  if(e.error)return toast(e.error.message);
+}
+const e=await db.from('sc_classes').delete().eq('school_id',APP.schoolId).eq('id',id);
+if(e.error)return toast(e.error.message);
 await logHistory('Deleted','Class',id,'Class '+classNo+' deleted');toast('Class '+classNo+' deleted');loadClasses()
 }
 function roomsHtml(rows){const total=(rows||[]).length,available=(rows||[]).filter(r=>r.status==='Available').length,unavailable=total-available,benches=(rows||[]).filter(r=>r.status==='Available').reduce((a,r)=>a+Number(r.capacity||0),0),capacity=benches*2;return `<div class="top"><div><h1>Rooms</h1><p>Manage exam rooms, physical bench capacity, physical layout, floors and availability for the current session.</p></div><div class="actions"><button class="btn" onclick="downloadRoomTemplate()">↓ DOWNLOAD TEMPLATE</button><label class="btn primary" for="roomFile">↑ UPLOAD EXCEL FILE</label><input id="roomFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this,'rooms')"><button class="btn danger" onclick="deleteAllRoomsDb()">DELETE ALL ROOMS</button><button class="btn primary" onclick="roomModalDb()">+ ADD ROOM</button></div></div><div class="cards"><div class="card"><div class="label">Total Rooms</div><div class="metric">${total}</div><div class="note">Configured for current session</div></div><div class="card"><div class="label">Available</div><div class="metric">${available}</div><div class="note good">Ready for examination use</div></div><div class="card"><div class="label">Unavailable</div><div class="metric">${unavailable}</div><div class="note">Temporarily unavailable</div></div><div class="card"><div class="label">Total Capacity</div><div class="metric">${capacity}</div><div class="note">Available rooms • 2 students per bench</div></div></div><div class="searchbar"><input placeholder="Search room, number or floor..." oninput="filterRows(this,'roomTable')"><select id="roomStatusFilter" class="btn" style="min-width:145px" onchange="filterRoomStatus(this)"><option value="">All statuses</option><option value="Available">Available</option><option value="Unavailable">Unavailable</option></select></div><div class="tablewrap"><table class="table" id="roomTable"><thead><tr><th>Room Number</th><th>Room Name</th><th>Layout</th><th>Capacity</th><th>Floor</th><th>Status</th><th>Actions</th></tr></thead><tbody>${(rows||[]).map(r=>`<tr data-room-status="${r.status}"><td><b>${r.room_number}</b></td><td>${r.room_name||'—'}</td><td>${r.layout_rows&&r.layout_columns?`<b>${r.layout_rows} × ${r.layout_columns}</b> layout · ${r.capacity||0} benches`:'<span style="color:#a66b00">Not configured</span>'}</td><td>${r.capacity?String(r.capacity)+' benches / '+String(Number(r.capacity)*2)+' students':'—'}</td><td>${r.floor||'—'}</td><td class="${r.status==='Available'?'dotgood':''}">${r.status}</td><td class="actions-cell"><button class="btn" onclick="roomModalDb('${r.id}')">Edit</button><button class="btn danger" style="margin-left:5px" onclick="deleteRoomDb('${r.id}','${String(r.room_name||r.room_number).replace(/'/g,"&#39;")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:#6d778b;padding:25px">No rooms configured yet.</td></tr>'}</tbody></table></div>`}
@@ -155,10 +171,10 @@ async function saveRoomDb(id){const rows=Number(document.getElementById('rmRows'
 async function deleteRoomDb(id,name){
   if(!confirm('Delete '+name+'? This cannot be undone.'))return;
   try{
-    const usage=await db.from('sc_seating_assignments').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('room_id',id);
+    const usage=await db.from('sc_seating_assignments').select('id').eq('school_id',APP.schoolId).eq('room_id',id).limit(1);
     if(usage.error)throw usage.error;
-    if((usage.count||0)>0)return toast('This room cannot be deleted because it is used by an existing seating plan.');
-    const e=await db.from('sc_rooms').delete().eq('id',id);
+    if(usage.data?.length)return toast('Room '+name+' cannot be deleted because seating assignments exist. Remove the seating plan first.');
+    const e=await db.from('sc_rooms').delete().eq('school_id',APP.schoolId).eq('id',id);
     if(e.error)throw e.error;
     await logHistory('Deleted','Room',id,name+' deleted');
     toast(name+' deleted');
@@ -168,7 +184,6 @@ async function deleteRoomDb(id,name){
     toast(e.message||'Unable to delete room.');
   }
 }
-
 function subjectsHtml(rows){return `<div class="top"><div><h1>Subjects</h1><p>Maintain class-wise subjects and assign roll numbers by subject.</p></div><div class="actions"><button class="btn" onclick="downloadSubjectTemplate()">↓ DOWNLOAD TEMPLATE</button><label class="btn primary" for="subjectFile">↑ UPLOAD EXCEL FILE</label><input id="subjectFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this,'subjects')"><button class="btn danger" onclick="deleteAllSubjectsDb()">DELETE ALL SUBJECTS</button><button class="btn primary" onclick="subjectModalDb()">+ ADD SUBJECT</button></div></div><div class="searchbar"><input placeholder="Search subject or class..." oninput="filterRows(this,'subjectTable')"></div><div class="tablewrap"><table class="table" id="subjectTable"><thead><tr><th>Class</th><th>Subject</th><th>Assigned / Total</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr><td>Class ${r.sc_classes?.class_number||'—'}</td><td>${r.subject_name}</td><td>${r.roll_assigned||0} / ${r.roll_total||0}</td><td class="${r.status==='Active'?'dotgood':''}">${r.status}</td><td class="actions-cell"><button class="btn" onclick="subjectModalDb('${r.id}',${r.sc_classes?.class_number||1})">Edit</button> <button class="btn" onclick="assignRollsDb('${r.id}',${r.sc_classes?.class_number||1},'${String(r.subject_name).replace(/'/g,"&#39;")}')">Assign Rolls</button> <button class="btn danger" style="margin-left:5px" onclick="deleteSubjectDb('${r.id}','${String(r.subject_name).replace(/'/g,"&#39;")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:#6d778b;padding:25px">No subjects configured yet.</td></tr>'}</tbody></table></div>`}
 
 async function loadSubjectRollCountsDb(){
@@ -336,7 +351,27 @@ async function saveRollAssignmentsDb(){
   }catch(e){console.error('saveRollAssignmentsDb failed',e);toast(e.message||'Unable to save roll assignments')}
 }
 async function deleteSubjectDb(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;const rollCheck=await db.from('sc_subject_rolls').select('id',{count:'exact',head:true}).eq('subject_id',id);if(rollCheck.error)return toast(rollCheck.error.message);if((rollCheck.count||0)>0)return toast('This subject has roll assignments and cannot be deleted. Remove the roll assignments first.');const result=await db.from('sc_subjects').delete().eq('id',id);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subject',id,name+' deleted');toast(name+' deleted');loadSubjects()}
-async function deleteAllRoomsDb(){const check=await db.from('sc_rooms').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(check.error)return toast(check.error.message);const count=check.count||0;if(!count)return toast('No rooms to delete.');if(!confirm('Delete all '+count+' room records for the current session? This cannot be undone.'))return;const result=await db.from('sc_rooms').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(result.error)return toast(result.error.message);await logHistory('Deleted','Rooms',null,count+' room records deleted');toast(count+' room'+(count===1?'':'s')+' deleted');loadRooms()}
+async function deleteAllRoomsDb(){
+  const check=await db.from('sc_rooms').select('id').eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);
+  if(check.error)return toast(check.error.message);
+  const roomIds=(check.data||[]).map(x=>x.id);
+  const count=roomIds.length;
+  if(!count)return toast('No rooms to delete.');
+  if(!confirm('Delete all '+count+' room records for the current session? This cannot be undone.'))return;
+  try{
+    const usage=await db.from('sc_seating_assignments').select('id').eq('school_id',APP.schoolId).in('room_id',roomIds).limit(1);
+    if(usage.error)throw usage.error;
+    if(usage.data?.length)return toast('Rooms cannot be deleted because seating assignments exist. Remove the seating plans first.');
+    const result=await db.from('sc_rooms').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).in('id',roomIds);
+    if(result.error)throw result.error;
+    await logHistory('Deleted','Rooms',null,count+' room records deleted');
+    toast(count+' room'+(count===1?'':'s')+' deleted');
+    await loadRooms();
+  }catch(e){
+    console.error('deleteAllRoomsDb failed',e);
+    toast(e.message||'Unable to delete rooms.');
+  }
+}
 async function deleteAllSubjectsDb(){
   const check=await db.from('sc_subjects').select('id',{count:'exact',head:false}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);
   if(check.error)return toast(check.error.message);
