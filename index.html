@@ -316,7 +316,28 @@ async function saveRollAssignmentsDb(){
 }
 async function deleteSubjectDb(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;const rollCheck=await db.from('sc_subject_rolls').select('id',{count:'exact',head:true}).eq('subject_id',id);if(rollCheck.error)return toast(rollCheck.error.message);if((rollCheck.count||0)>0)return toast('This subject has roll assignments and cannot be deleted. Remove the roll assignments first.');const result=await db.from('sc_subjects').delete().eq('id',id);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subject',id,name+' deleted');toast(name+' deleted');loadSubjects()}
 async function deleteAllRoomsDb(){const check=await db.from('sc_rooms').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(check.error)return toast(check.error.message);const count=check.count||0;if(!count)return toast('No rooms to delete.');if(!confirm('Delete all '+count+' room records for the current session? This cannot be undone.'))return;const result=await db.from('sc_rooms').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(result.error)return toast(result.error.message);await logHistory('Deleted','Rooms',null,count+' room records deleted');toast(count+' room'+(count===1?'':'s')+' deleted');loadRooms()}
-async function deleteAllSubjectsDb(){const check=await db.from('sc_subjects').select('id',{count:'exact',head:true}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(check.error)return toast(check.error.message);const count=check.count||0;if(!count)return toast('No subjects to delete.');if(!confirm('Delete all '+count+' subject records for the current session? This will also remove their roll assignments and cannot be undone.'))return;const rolls=await db.from('sc_subject_rolls').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(rolls.error)return toast(rolls.error.message);const result=await db.from('sc_subjects').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);if(result.error)return toast(result.error.message);await logHistory('Deleted','Subjects',null,count+' subject records deleted');toast(count+' subject'+(count===1?'':'s')+' deleted');loadSubjects()}
+async function deleteAllSubjectsDb(){
+  const check=await db.from('sc_subjects').select('id',{count:'exact',head:false}).eq('school_id',APP.schoolId).eq('session_id',APP.sessionId);
+  if(check.error)return toast(check.error.message);
+  const subjectIds=(check.data||[]).map(x=>x.id);
+  const count=check.count||subjectIds.length;
+  if(!count)return toast('No subjects to delete.');
+  if(!confirm('Delete all '+count+' subject records for the current session? This will also remove their roll assignments and cannot be undone.'))return;
+  try{
+    if(subjectIds.length){
+      const rolls=await db.from('sc_subject_rolls').delete().eq('school_id',APP.schoolId).in('subject_id',subjectIds);
+      if(rolls.error)throw rolls.error;
+    }
+    const result=await db.from('sc_subjects').delete().eq('school_id',APP.schoolId).eq('session_id',APP.sessionId).in('id',subjectIds);
+    if(result.error)throw result.error;
+    await logHistory('Deleted','Subjects',null,count+' subject records deleted');
+    toast(count+' subject'+(count===1?'':'s')+' deleted');
+    await loadSubjects();
+  }catch(e){
+    console.error('deleteAllSubjectsDb failed',e);
+    toast(e.message||'Unable to delete all subjects.');
+  }
+}
 
 
 function plannerEscape(v){
