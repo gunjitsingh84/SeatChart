@@ -1039,30 +1039,63 @@ function seatingPositionList(room){
   return positions;
 }
 
+function seatingRoomNumberSort(a,b){
+  const aText=String(a?.room_number??'').trim(),bText=String(b?.room_number??'').trim();
+  const aNum=Number(aText),bNum=Number(bText);
+  if(Number.isFinite(aNum)&&Number.isFinite(bNum)&&aNum!==bNum)return aNum-bNum;
+  return aText.localeCompare(bText,undefined,{numeric:true,sensitivity:'base'});
+}
+
+function selectedSeatingRoomsInOrder(){
+  const s=window.seatingRuleState;
+  if(!s)return[];
+  return [...(s.selectedRooms||[])].sort(seatingRoomNumberSort);
+}
+
 function generateSeatingPlan(){
   const s=window.seatingRuleState;
   if(!s)return null;
   const result=buildSeatingBenches();
-  const selectedRooms=[...(s.selectedRooms||[])];
+  const selectedRooms=selectedSeatingRoomsInOrder();
   const positions=[];
   let benchCursor=0;
   const roomAllocation=[];
-  selectedRooms.forEach(room=>{
+
+  // Fill each selected room to its configured physical bench capacity before using the next room.
+  for(const room of selectedRooms){
+    const capacity=Number(room.capacity||0);
     const roomPositions=seatingPositionList(room);
+    if(roomPositions.length!==capacity)throw new Error('Room '+String(room.room_number||'')+' has '+roomPositions.length+' usable positions but a capacity of '+capacity+'.');
     const remaining=result.benches.length-benchCursor;
-    const benchesForRoom=Math.max(0,Math.min(roomPositions.length,remaining));
-    roomAllocation.push({roomId:room.id,roomNumber:room.room_number,capacity:Number(room.capacity||0),positionsAvailable:roomPositions.length,benchesAssigned:benchesForRoom});
-    for(let i=0;i<benchesForRoom;i++)positions.push({room,row:roomPositions[i].row,column:roomPositions[i].column});
+    const benchesForRoom=Math.min(capacity,Math.max(0,remaining));
+
+    roomAllocation.push({
+      roomId:room.id,
+      roomNumber:room.room_number,
+      capacity,
+      positionsAvailable:roomPositions.length,
+      benchesAssigned:benchesForRoom,
+      full:benchesForRoom===capacity
+    });
+
+    for(let i=0;i<benchesForRoom;i++){
+      positions.push({room,row:roomPositions[i].row,column:roomPositions[i].column});
+    }
     benchCursor+=benchesForRoom;
-  });
+    if(benchCursor>=result.benches.length)break;
+  }
+
   if(benchCursor<result.benches.length)throw new Error('Selected rooms provide '+benchCursor+' usable bench positions, but '+result.benches.length+' benches are required after applying the seating rules. Select additional rooms.');
+
   const roomBenchCounters=new Map();
   const assignments=result.benches.map((bench,index)=>{
     const slot=positions[index];
+    if(!slot)throw new Error('No physical bench position is available for generated bench '+(index+1)+'.');
     const nextBenchNumber=(roomBenchCounters.get(slot.room.id)||0)+1;
     roomBenchCounters.set(slot.room.id,nextBenchNumber);
     return{benchNumber:nextBenchNumber,roomId:slot.room.id,roomNumber:slot.room.room_number,roomName:slot.room.room_name||'',floor:slot.room.floor||'',row:slot.row,column:slot.column,students:bench.students};
   });
+
   const assignedKeys=assignments.flatMap(x=>x.students.map(y=>y.key));
   const uniqueAssigned=new Set(assignedKeys);
   if(uniqueAssigned.size!==assignedKeys.length)throw new Error('Seating generation created duplicate candidate assignments.');
