@@ -265,3 +265,24 @@ When starting a new SeatChart development chat:
 10. Tell the user the merge commit and what to test live.
 
 Do not rebuild or redesign SeatChart from scratch. Continue from the current repository state.
+
+## Super Admin Console
+
+- Separate application path: `/admin`
+- Intended Vercel project: `seat-chart-admin`
+- Production URL: `https://seat-chart-admin.vercel.app/`
+- Deploy as a second Vercel project from this same repository with Root Directory set to `admin`.
+- Super Admin access is separate from school Administrator/Staff access.
+- Authorization is stored in `sc_super_admins`.
+- Platform-wide reads and management actions use protected Supabase database functions; the browser never receives a service/secret key.
+- Dashboard shows:
+  - New school registrations
+  - New user registrations
+  - Total schools / active / suspended
+  - Configured students, rooms, subjects
+  - Exam plans and seating plans
+- Schools view provides per-school summaries and school detail.
+- School management supports profile updates and Active/Suspended status.
+- Suspending a school blocks normal SeatChart login for that school.
+- School detail currently exposes users, academic sessions, exams and platform counts for classes, sections, rooms, subjects, exam schedules, seating plans and seating assignments.
+- A Super Admin account must be explicitly inserted into `sc_super_admins` after its Supabase Auth user exists.
